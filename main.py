@@ -10,7 +10,7 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 
 print("🚀 Auto Invoice Bot starting...")
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8039322974:AAEp1IICwyI8B9WtXPLA21_YhWzQoNcF02Q')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8760516717:AAFjIvQTVgWIM2wJQVlRBEped4rM6fAakLM')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
