@@ -68,8 +68,19 @@ def fetch_invoices():
     try:
         response = requests.get(SHEETS_CSV_URL, allow_redirects=True, timeout=30)
         content = response.content.decode('utf-8-sig')
-        reader = csv.DictReader(io.StringIO(content))
-        return list(reader)
+        all_rows = list(csv.reader(io.StringIO(content)))
+        if not all_rows:
+            return []
+        headers = all_rows[0]
+        result = []
+        for raw in all_rows[1:]:
+            d = {}
+            for i, h in enumerate(headers):
+                if h not in d and i < len(raw):
+                    d[h] = raw[i]
+            d['_raw'] = raw  # preserve all columns for document scanning
+            result.append(d)
+        return result
     except Exception:
         return []
 
@@ -79,13 +90,14 @@ def clean_doc_name(name):
     return name.strip()
 
 def get_doc_types_from_row(row):
-    """Returns list of (name, url) for all completed documents in a row"""
+    """Returns list of (name, url) for all completed documents in a row."""
+    # Use _raw list to avoid losing duplicate-named columns
+    cells = row.get('_raw', list(row.values())) if isinstance(row, dict) else row
     doc_types = []
-    keys = list(row.keys())
     seen_urls = set()
 
-    for i, key in enumerate(keys):
-        value = (row[key] or '').strip()
+    for i, value in enumerate(cells):
+        value = (value or '').strip()
         if value in seen_urls:
             continue
         if not (value.startswith('https://drive.google.com/') or
@@ -94,11 +106,10 @@ def get_doc_types_from_row(row):
         seen_urls.add(value)
 
         name = None
-        # Check next 3 columns for document name
         for j in range(1, 4):
-            if i + j >= len(keys):
+            if i + j >= len(cells):
                 break
-            candidate = (row[keys[i + j]] or '').strip()
+            candidate = (cells[i + j] or '').strip()
             if (candidate
                     and not candidate.startswith('http')
                     and 'Document successfully' not in candidate
