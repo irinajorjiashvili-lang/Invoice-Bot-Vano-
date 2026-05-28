@@ -89,6 +89,15 @@ def clean_doc_name(name):
         name = name[:name.index('<<')]
     return name.strip()
 
+def last_data_row(rows):
+    """Returns last row that has actual invoice data (non-empty Lot or Customer)."""
+    for row in reversed(rows):
+        lot = row.get('Lot', '') or ''
+        customer = row.get('Customer_Name', '') or ''
+        if lot.strip() or customer.strip():
+            return row
+    return rows[-1] if rows else None
+
 def get_doc_types_from_row(row):
     """Returns list of (name, url) for all completed documents in a row."""
     # Use _raw list to avoid losing duplicate-named columns
@@ -256,9 +265,9 @@ def handle_doctype_refresh(call):
     if lot_key and lot_key != 'last':
         row = next((r for r in reversed(rows) if r.get('Lot', '').strip() == lot_key.strip()), None)
         if not row:
-            row = rows[-1]
+            row = last_data_row(rows)
     else:
-        row = rows[-1]
+        row = last_data_row(rows)
 
     vehicle = row.get('Vehicle', '') or ''
     date = row.get('Date', '') or ''
@@ -483,7 +492,10 @@ def handle_docs(message):
         safe_send_message(chat_id, "Не удалось загрузить данные")
         return
 
-    row = rows[-1]
+    row = last_data_row(rows)
+    if not row:
+        safe_send_message(chat_id, "Нет данных в таблице")
+        return
     vehicle = row.get('Vehicle', '') or ''
     date = row.get('Date', '') or ''
     lot = row.get('Lot', '') or ''
