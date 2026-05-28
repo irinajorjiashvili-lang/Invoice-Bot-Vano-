@@ -14,8 +14,10 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 print("Bot starting...")
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8760516717:AAFjIvQTVgWIM2wJQVlRBEped4rM6fAakLM')
+BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
+authorized_users = set()
 
 GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
 SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
@@ -509,6 +511,9 @@ def handle_docs(message):
 @bot.message_handler(content_types=['document', 'photo'])
 def handle_file(message):
     chat_id = message.chat.id
+    if chat_id not in authorized_users:
+        safe_send_message(chat_id, "🔒 Введите пароль:")
+        return
     now = datetime.now()
     user_state[chat_id] = {
         'data': {
@@ -526,13 +531,32 @@ def handle_text(message):
     text = message.text.strip()
 
     if text.startswith('/start'):
-        safe_send_message(
-            chat_id,
-            "<b>Auto Invoice Bot</b>\n\n"
-            "Отправьте PDF или фото инвойса\n"
-            "/docs — документы последней машины",
-            parse_mode='HTML'
-        )
+        if chat_id in authorized_users:
+            safe_send_message(
+                chat_id,
+                "<b>Auto Invoice Bot</b>\n\n"
+                "Отправьте PDF или фото инвойса\n"
+                "/docs — документы последней машины",
+                parse_mode='HTML'
+            )
+        else:
+            safe_send_message(chat_id, "🔒 Введите пароль:")
+        return
+
+    # Password check
+    if chat_id not in authorized_users:
+        if text == BOT_PASSWORD:
+            authorized_users.add(chat_id)
+            safe_send_message(
+                chat_id,
+                "✅ Доступ открыт\n\n"
+                "<b>Auto Invoice Bot</b>\n\n"
+                "Отправьте PDF или фото инвойса\n"
+                "/docs — документы последней машины",
+                parse_mode='HTML'
+            )
+        else:
+            safe_send_message(chat_id, "❌ Неверный пароль. Попробуйте ещё раз:")
         return
 
     if chat_id not in user_state:
