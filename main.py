@@ -88,8 +88,8 @@ def get_doc_types_from_row(row):
         value = (row[key] or '').strip()
         if value in seen_urls:
             continue
-        if not (value.startswith('https://drive.google.com/file/d/') or
-                value.startswith('https://docs.google.com/document/d/')):
+        if not (value.startswith('https://drive.google.com/') or
+                value.startswith('https://docs.google.com/')):
             continue
         seen_urls.add(value)
 
@@ -130,12 +130,27 @@ def download_drive_file(url):
         elif '/document/d/' in url:
             file_id = url.split('/document/d/')[1].split('/')[0].split('?')[0]
             is_doc = True
+        elif '/spreadsheets/d/' in url:
+            file_id = url.split('/spreadsheets/d/')[1].split('/')[0].split('?')[0]
+            is_doc = True
+        elif '/presentation/d/' in url:
+            file_id = url.split('/presentation/d/')[1].split('/')[0].split('?')[0]
+            is_doc = True
+        elif 'open?id=' in url:
+            file_id = url.split('open?id=')[1].split('&')[0]
+        elif 'id=' in url:
+            file_id = url.split('id=')[1].split('&')[0]
 
         if not file_id:
             return None
 
         if is_doc:
-            dl_url = f"https://docs.google.com/document/d/{file_id}/export?format=pdf"
+            if '/spreadsheets/d/' in url:
+                dl_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=pdf"
+            elif '/presentation/d/' in url:
+                dl_url = f"https://docs.google.com/presentation/d/{file_id}/export/pdf"
+            else:
+                dl_url = f"https://docs.google.com/document/d/{file_id}/export?format=pdf"
         else:
             dl_url = f"https://drive.google.com/uc?export=download&id={file_id}"
 
@@ -505,39 +520,39 @@ def handle_text(message):
 
     if waiting == 'Lot':
         user_state[chat_id]['data']['Lot'] = text
-        safe_send_message(chat_id, f"LOT: <b>{text}</b>\n\nВведите VIN:", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ LOT: <b>{text}</b>\n\n🔢 Введите VIN:", parse_mode='HTML')
         user_state[chat_id]['waiting_for'] = 'Vin'
 
     elif waiting == 'Vin':
         user_state[chat_id]['data']['Vin'] = text
-        safe_send_message(chat_id, f"VIN: <b>{text}</b>\n\nВведите авто:", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ VIN: <b>{text}</b>\n\n🚙 Введите авто:", parse_mode='HTML')
         user_state[chat_id]['waiting_for'] = 'Vehicle'
 
     elif waiting == 'Vehicle':
         user_state[chat_id]['data']['Vehicle'] = text
-        safe_send_message(chat_id, f"Авто: <b>{text}</b>\n\nВведите Amount USD:", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ Авто: <b>{text}</b>\n\n💰 Введите Amount USD:", parse_mode='HTML')
         user_state[chat_id]['waiting_for'] = 'Amount_USD'
 
     elif waiting == 'Amount_USD':
         user_state[chat_id]['data']['Amount_USD'] = text
-        safe_send_message(chat_id, f"Amount: <b>${text}</b>", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ Amount: <b>${text}</b>", parse_mode='HTML')
         time.sleep(0.5)
         ask_buyer_selection(chat_id)
 
     elif waiting == 'Buyer_manual':
         user_state[chat_id]['data']['Buyer'] = text
-        safe_send_message(chat_id, f"Buyer: <b>{text}</b>", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ Buyer: <b>{text}</b>", parse_mode='HTML')
         time.sleep(0.5)
         ask_customer_type(chat_id)
 
     elif waiting == 'Customer_Name':
         user_state[chat_id]['data']['Customer_Name'] = text
-        safe_send_message(chat_id, f"Клиент: <b>{text}</b>\n\nВведите Customer ID:", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ Клиент: <b>{text}</b>\n\n🆔 Введите Customer ID:", parse_mode='HTML')
         user_state[chat_id]['waiting_for'] = 'Customer_ID'
 
     elif waiting == 'Customer_ID':
         user_state[chat_id]['data']['Customer_ID'] = text
-        safe_send_message(chat_id, f"ID: <b>{text}</b>\n\nВведите Auction Fee:", parse_mode='HTML')
+        safe_send_message(chat_id, f"✅ ID: <b>{text}</b>\n\n💸 Введите Auction Fee:", parse_mode='HTML')
         user_state[chat_id]['waiting_for'] = 'Auction_Fee'
 
     elif waiting == 'Auction_Fee':
@@ -554,7 +569,7 @@ def handle_text(message):
 
             safe_send_message(
                 chat_id,
-                f"Fee: <b>${fee}</b>  |  Total: <b>${total}</b>\n\nОтправляю...",
+                f"✅ Fee: <b>${fee}</b>  |  Total: <b>${total}</b>\n\n📤 Отправляю...",
                 parse_mode='HTML'
             )
 
