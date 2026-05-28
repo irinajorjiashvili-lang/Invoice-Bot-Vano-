@@ -94,15 +94,21 @@ def get_doc_types_from_row(row):
         seen_urls.add(value)
 
         name = None
-        # Check next column for document name
-        if i + 1 < len(keys):
-            next_val = (row[keys[i + 1]] or '').strip()
-            if (next_val
-                    and not next_val.startswith('http')
-                    and 'Document successfully' not in next_val
-                    and 'Starting at' not in next_val
-                    and len(next_val) < 150):
-                name = clean_doc_name(next_val)
+        # Check next 3 columns for document name
+        for j in range(1, 4):
+            if i + j >= len(keys):
+                break
+            candidate = (row[keys[i + j]] or '').strip()
+            if (candidate
+                    and not candidate.startswith('http')
+                    and 'Document successfully' not in candidate
+                    and 'Starting at' not in candidate
+                    and 'Run via' not in candidate
+                    and 'Timestamp:' not in candidate
+                    and len(candidate) >= 3
+                    and len(candidate) < 150):
+                name = clean_doc_name(candidate)
+                break
 
         if not name:
             name = f"Document {len(doc_types) + 1}"
@@ -168,25 +174,26 @@ def send_pdf_to_user(chat_id, name, url):
 
 # ── Document selector ──────────────────────────────────────────────────────────
 
-def show_doc_type_selector(chat_id, label, doc_types):
+def show_doc_type_selector(chat_id, label, doc_types, lot_key=''):
     if not doc_types:
-        safe_send_message(chat_id, "Документы ещё не готовы или не найдены")
+        safe_send_message(chat_id, "⏳ Документы ещё не готовы — попробуйте /docs через минуту")
         return
 
     if chat_id not in user_state:
         user_state[chat_id] = {}
     user_state[chat_id]['current_doc_types'] = doc_types
     user_state[chat_id]['current_doc_selected'] = set()
+    user_state[chat_id]['current_lot_key'] = lot_key
 
-    keyboard = build_doctype_keyboard(doc_types, set())
+    keyboard = build_doctype_keyboard(doc_types, set(), lot_key)
     safe_send_message(
         chat_id,
-        f"Документы: <b>{label}</b>\nВыберите нужные:",
+        f"📄 <b>{label}</b>\nВыберите нужные:",
         reply_markup=keyboard,
         parse_mode='HTML'
     )
 
-def build_doctype_keyboard(doc_types, selected):
+def build_doctype_keyboard(doc_types, selected, lot_key=''):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     for i, (name, url) in enumerate(doc_types):
         check = '[x]' if i in selected else '[ ]'
@@ -203,7 +210,52 @@ def build_doctype_keyboard(doc_types, selected):
         text="Отправить все",
         callback_data="dtsendall"
     ))
+    keyboard.add(types.InlineKeyboardButton(
+        text="Обновить список",
+        callback_data=f"dtrefresh_{lot_key}"
+    ))
     return keyboard
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('dtrefresh_'))
+def handle_doctype_refresh(call):
+    chat_id = call.message.chat.id
+    lot_key = call.data[len('dtrefresh_'):]
+    safe_answer_callback(call.id, "Обновляю...")
+
+    rows = fetch_invoices()
+    if not rows:
+        safe_send_message(chat_id, "Не удалось загрузить данные")
+        return
+
+    if lot_key and lot_key != 'last':
+        row = next((r for r in reversed(rows) if r.get('Lot', '').strip() == lot_key.strip()), None)
+        if not row:
+            row = rows[-1]
+    else:
+        row = rows[-1]
+
+    vehicle = row.get('Vehicle', '') or ''
+    date = row.get('Date', '') or ''
+    lot = row.get('Lot', '') or ''
+    label = f"{vehicle} | {date}" if vehicle else date
+    doc_types = get_doc_types_from_row(row)
+
+    if chat_id not in user_state:
+        user_state[chat_id] = {}
+    user_state[chat_id]['current_doc_types'] = doc_types
+    user_state[chat_id]['current_doc_selected'] = set()
+    user_state[chat_id]['current_lot_key'] = lot_key
+
+    keyboard = build_doctype_keyboard(doc_types, set(), lot_key)
+    try:
+        bot.edit_message_text(
+            f"📄 <b>{label}</b>\nВыберите нужные: ({len(doc_types)} документов)",
+            chat_id, call.message.message_id,
+            reply_markup=keyboard,
+            parse_mode='HTML'
+        )
+    except Exception:
+        safe_send_message(chat_id, f"📄 <b>{label}</b>\nВыберите нужные:", reply_markup=keyboard, parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('dtoggle_'))
 def handle_doctype_toggle(call):
@@ -304,22 +356,22 @@ def send_completion_message(chat_id, data):
     try:
         d = data
         msg = (
-            "<b>Данные отправлены</b>\n"
+            "✅ <b>Данные отправлены</b>\n"
             "──────────────────\n"
-            f"Дата: {d['Date_Day']}.{d['Date_Month']}.{d['Date_Year']}\n"
-            f"Клиент: {d.get('Customer_Name', '—')}\n"
-            f"ID: {d.get('Customer_ID', '—')}\n"
-            f"Buyer: {d.get('Buyer', '—')}\n"
+            f"📅 Дата: {d['Date_Day']}.{d['Date_Month']}.{d['Date_Year']}\n"
+            f"👤 Клиент: {d.get('Customer_Name', '—')}\n"
+            f"🆔 ID: {d.get('Customer_ID', '—')}\n"
+            f"🏢 Buyer: {d.get('Buyer', '—')}\n"
             "──────────────────\n"
-            f"Лот: {d.get('Lot', '—')}\n"
-            f"Авто: {d.get('Vehicle', '—')}\n"
-            f"VIN: {d.get('Vin', '—')}\n"
+            f"🚗 Лот: {d.get('Lot', '—')}\n"
+            f"🚙 Авто: {d.get('Vehicle', '—')}\n"
+            f"🔢 VIN: {d.get('Vin', '—')}\n"
             "──────────────────\n"
-            f"Amount: ${d.get('Amount_USD', '—')}\n"
-            f"Fee: ${d.get('Auction_Fee', '—')}\n"
-            f"Total: ${d.get('Total_USD', '—')}\n"
+            f"💰 Amount: ${d.get('Amount_USD', '—')}\n"
+            f"💸 Fee: ${d.get('Auction_Fee', '—')}\n"
+            f"💵 Total: ${d.get('Total_USD', '—')}\n"
             "──────────────────\n"
-            "Документы будут готовы через ~2 минуты"
+            "⏳ Документы будут готовы через ~2 минуты"
         )
         safe_send_message(chat_id, msg, parse_mode='HTML')
 
@@ -333,7 +385,7 @@ def send_completion_message(chat_id, data):
             if row:
                 doc_types = get_doc_types_from_row(row)
                 label = f"{lot} | {vehicle}"
-                show_doc_type_selector(chat_id, label, doc_types)
+                show_doc_type_selector(chat_id, label, doc_types, lot_key=lot)
             else:
                 safe_send_message(chat_id, f"Документы для лота <b>{lot}</b> — используйте /docs", parse_mode='HTML')
 
@@ -412,7 +464,7 @@ def handle_docs(message):
 
     label = f"{vehicle} | {date}" if vehicle else date
     doc_types = get_doc_types_from_row(row)
-    show_doc_type_selector(chat_id, label, doc_types)
+    show_doc_type_selector(chat_id, label, doc_types, lot_key=lot or 'last')
 
 # ── File & text handlers ───────────────────────────────────────────────────────
 
