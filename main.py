@@ -1,4 +1,6 @@
 import os
+import csv
+import io
 import telebot
 from datetime import datetime
 from telebot import types
@@ -23,6 +25,8 @@ REGULAR_CUSTOMER = {
     'name': 'ჰასანოვი მუქალდარ',
     'id': '28001088898'
 }
+
+SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
 
 GOOGLE_FORM_FIELDS = {
     'Date_Year': 'entry.2136135204_year',
@@ -129,6 +133,122 @@ def send_completion_message(chat_id, data):
 
     except Exception as e:
         safe_send_message(chat_id, "❌ Ошибка")
+
+# ── Google Sheets ──────────────────────────────────────────────────────────────
+
+def fetch_invoices():
+    try:
+        response = requests.get(SHEETS_CSV_URL, allow_redirects=True, timeout=30)
+        content = response.content.decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+        return list(reader)
+    except Exception:
+        return []
+
+def build_docs_keyboard(recent, rows_offset, selected):
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    for i, row in enumerate(recent):
+        lot = row.get('Lot', 'N/A')
+        vehicle = (row.get('Vehicle', '') or '')[:22]
+        date = (row.get('Date', '') or '')[:10]
+        actual_index = rows_offset + i
+        check = '☑' if actual_index in selected else '☐'
+        btn_text = f"{check} {lot} | {vehicle} | {date}"
+        keyboard.add(types.InlineKeyboardButton(
+            text=btn_text,
+            callback_data=f"toggle_{actual_index}"
+        ))
+    keyboard.add(types.InlineKeyboardButton(
+        text=f"📤 Отправить выбранные ({len(selected)})",
+        callback_data="send_docs"
+    ))
+    return keyboard
+
+@bot.message_handler(commands=['docs'])
+def handle_docs(message):
+    chat_id = message.chat.id
+    safe_send_message(chat_id, "⏳ Загружаю список документов...")
+
+    rows = fetch_invoices()
+    if not rows:
+        safe_send_message(chat_id, "❌ Не удалось загрузить список")
+        return
+
+    recent = rows[-15:]
+    rows_offset = len(rows) - len(recent)
+
+    if chat_id not in user_state:
+        user_state[chat_id] = {}
+    user_state[chat_id]['selected_docs'] = set()
+    user_state[chat_id]['docs_rows'] = recent
+    user_state[chat_id]['docs_offset'] = rows_offset
+
+    keyboard = build_docs_keyboard(recent, rows_offset, set())
+    safe_send_message(chat_id, f"📋 Последние {len(recent)} инвойсов:\nВыберите один или несколько:", reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('toggle_'))
+def handle_toggle(call):
+    chat_id = call.message.chat.id
+    index = int(call.data.split('_')[1])
+
+    if chat_id not in user_state or 'selected_docs' not in user_state[chat_id]:
+        safe_answer_callback(call.id, "Начните заново — /docs")
+        return
+
+    selected = user_state[chat_id]['selected_docs']
+    if index in selected:
+        selected.discard(index)
+        safe_answer_callback(call.id, "Снято")
+    else:
+        selected.add(index)
+        safe_answer_callback(call.id, "Выбрано ✓")
+
+    recent = user_state[chat_id]['docs_rows']
+    rows_offset = user_state[chat_id]['docs_offset']
+    keyboard = build_docs_keyboard(recent, rows_offset, selected)
+
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=keyboard)
+    except Exception:
+        pass
+
+@bot.callback_query_handler(func=lambda call: call.data == 'send_docs')
+def handle_send_docs(call):
+    chat_id = call.message.chat.id
+    safe_answer_callback(call.id, "Загружаю...")
+
+    if chat_id not in user_state or not user_state[chat_id].get('selected_docs'):
+        safe_send_message(chat_id, "❌ Ничего не выбрано — нажмите на документы")
+        return
+
+    selected = user_state[chat_id]['selected_docs']
+    rows = fetch_invoices()
+
+    for index in sorted(selected):
+        if index >= len(rows):
+            continue
+        row = rows[index]
+        lot = row.get('Lot', 'N/A')
+        vehicle = row.get('Vehicle', 'N/A')
+        date = row.get('Date', 'N/A')
+        customer = row.get('Customer_Name', 'N/A')
+        total = row.get('Total_USD', 'N/A')
+
+        msg = f"🚗 Лот: {lot}\n🚙 Авто: {vehicle}\n📅 Дата: {date}\n👤 Клиент: {customer}\n💵 Итого: ${total}\n\n📁 Документы:\n"
+
+        links_found = False
+        for key, value in row.items():
+            if value and str(value).startswith('http') and 'Link' in key:
+                msg += f"• {value}\n"
+                links_found = True
+
+        if not links_found:
+            msg += "❌ Ссылки не найдены"
+
+        safe_send_message(chat_id, msg)
+        time.sleep(0.5)
+
+    user_state[chat_id]['selected_docs'] = set()
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('buyer_'))
 def handle_buyer_selection(call):
