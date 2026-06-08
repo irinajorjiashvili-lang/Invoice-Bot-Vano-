@@ -371,6 +371,8 @@ def ask_customer_type(chat_id):
 
 # ── Google Form ────────────────────────────────────────────────────────────────
 
+GOOGLE_FORM_VIEW_URL = "https://docs.google.com/forms/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/viewform"
+
 def submit_to_google_form(data):
     try:
         form_data = {
@@ -381,12 +383,22 @@ def submit_to_google_form(data):
         form_data['fvv'] = '1'
         form_data['fbzx'] = str(int(time.time() * 1000))
         form_data['pageHistory'] = '0'
+
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': GOOGLE_FORM_VIEW_URL,
+        })
+
+        # Open form first to get session cookies
+        session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
+
         print(f"[FORM] Submitting to: {GOOGLE_FORM_SUBMIT_URL}")
         print(f"[FORM] Data: {form_data}")
-        response = requests.post(
+        response = session.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
-            headers={'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded'},
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
             allow_redirects=True,
             timeout=30
         )
