@@ -380,6 +380,7 @@ def submit_to_google_form(data):
         }
         form_data['fvv'] = '1'
         form_data['fbzx'] = str(int(time.time() * 1000))
+        form_data['pageHistory'] = '0'
         print(f"[FORM] Submitting to: {GOOGLE_FORM_SUBMIT_URL}")
         print(f"[FORM] Data: {form_data}")
         response = requests.post(
