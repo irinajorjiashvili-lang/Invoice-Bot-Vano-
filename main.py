@@ -509,6 +509,25 @@ def handle_docs(message):
     doc_types = get_doc_types_from_row(row)
     show_doc_type_selector(chat_id, label, doc_types, lot_key=lot or 'last')
 
+# ── /new — ручной ввод без файла ──────────────────────────────────────────────
+
+@bot.message_handler(commands=['new'])
+def handle_new(message):
+    chat_id = message.chat.id
+    if chat_id not in authorized_users:
+        safe_send_message(chat_id, "🔒 Введите пароль:")
+        return
+    now = datetime.now()
+    user_state[chat_id] = {
+        'data': {
+            'Date_Year': str(now.year),
+            'Date_Month': str(now.month),
+            'Date_Day': str(now.day)
+        },
+        'waiting_for': 'Lot'
+    }
+    safe_send_message(chat_id, "📝 Ручной ввод\n\nВведите LOT:")
+
 # ── File & text handlers ───────────────────────────────────────────────────────
 
 @bot.message_handler(content_types=['document', 'photo'])
@@ -539,6 +558,7 @@ def handle_text(message):
                 chat_id,
                 "<b>Auto Invoice Bot</b>\n\n"
                 "Отправьте PDF или фото инвойса\n"
+                "/new — ввод без файла (вручную)\n"
                 "/docs — документы последней машины",
                 parse_mode='HTML'
             )
