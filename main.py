@@ -538,13 +538,17 @@ def handle_checkform(message):
         resp = requests.get(GOOGLE_FORM_VIEW_URL, timeout=15,
                             headers={'User-Agent': 'Mozilla/5.0'})
         html = resp.text
-        entries = re.findall(r'entry\.(\d+)', html)
-        unique = list(dict.fromkeys(entries))
-        if unique:
-            safe_send_message(chat_id, "Найденные entry ID в форме:\n" +
-                              "\n".join(f"entry.{e}" for e in unique))
-        else:
-            safe_send_message(chat_id, "entry ID не найдены. Возможно форма закрыта или недоступна.")
+
+        # Extract from FB_PUBLIC_LOAD_DATA_ — contains all field IDs
+        ids_from_data = re.findall(r'\[(\d{7,11}),', html)
+        ids_from_entry = re.findall(r'entry\.(\d+)', html)
+        all_ids = list(dict.fromkeys(ids_from_data + ids_from_entry))
+
+        # Filter: only IDs that look like entry IDs (7-11 digits)
+        all_ids = [i for i in all_ids if 7 <= len(i) <= 11]
+
+        safe_send_message(chat_id, f"Статус: {resp.status_code}\nURL: {resp.url}\n\nНайдено ID ({len(all_ids)}):\n" +
+                          "\n".join(f"entry.{e}" for e in all_ids[:30]))
     except Exception as e:
         safe_send_message(chat_id, f"Ошибка: {e}")
 
