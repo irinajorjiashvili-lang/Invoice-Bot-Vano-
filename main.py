@@ -20,9 +20,8 @@ user_state = {}
 authorized_users = set()
 
 GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
+GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
 SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
-
-VALID_BUYERS = ['169705', '657313', '218751', '218761']
 
 REGULAR_CUSTOMER = {
     'name': 'ჰასანოვი მუქალდარ',
@@ -30,19 +29,31 @@ REGULAR_CUSTOMER = {
 }
 
 GOOGLE_FORM_FIELDS = {
-    'Date_Year': 'entry.2136135204_year',
-    'Date_Month': 'entry.2136135204_month',
-    'Date_Day': 'entry.2136135204_day',
-    'Customer_Name': 'entry.21018057',
-    'Customer_ID': 'entry.1116307930',
-    'Lot': 'entry.1163357354',
-    'Vehicle': 'entry.341377459',
-    'Vin': 'entry.1094744061',
-    'Amount_USD': 'entry.1342000086',
-    'Auction_Fee': 'entry.532543637',
-    'Total_USD': 'entry.857168306',
-    'Buyer': 'entry.784567376'
+    'Date_Year':    'entry.2136135204_year',
+    'Date_Month':   'entry.2136135204_month',
+    'Date_Day':     'entry.2136135204_day',
+    'Customer_Name':'entry.21018057',
+    'Customer_ID':  'entry.1116307930',
+    'Lot':          'entry.1163357354',
+    'Vehicle':      'entry.341377459',
+    'Vin':          'entry.1094744061',
+    'Amount_USD':   'entry.1342000086',
+    'Auction_Fee':  'entry.532543637',
+    'Total_USD':    'entry.857168306',
+    'Buyer':        'entry.784567376'
 }
+
+BULK_PROMPT = (
+    "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
+    "LOT\n"
+    "VIN\n"
+    "Авто (год марка модель)\n"
+    "Amount USD\n"
+    "Buyer\n"
+    "Имя клиента\n"
+    "ID клиента\n"
+    "Auction Fee"
+)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +75,38 @@ def safe_answer_callback(call_id, text, max_retries=3):
                 time.sleep(1)
     return None
 
+# ── Invoice start keyboard ─────────────────────────────────────────────────────
+
+def invoice_keyboard():
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("📎 Загрузить файл", callback_data="inv_upload"),
+        types.InlineKeyboardButton("✏️ Ввести вручную", callback_data="inv_manual")
+    )
+    return keyboard
+
+def start_bulk_input(chat_id):
+    now = datetime.now()
+    user_state[chat_id] = {
+        'data': {
+            'Date_Year':  str(now.year),
+            'Date_Month': str(now.month),
+            'Date_Day':   str(now.day)
+        },
+        'waiting_for': 'bulk_input'
+    }
+    safe_send_message(chat_id, BULK_PROMPT)
+
+@bot.callback_query_handler(func=lambda call: call.data in ['inv_upload', 'inv_manual'])
+def handle_invoice_choice(call):
+    chat_id = call.message.chat.id
+    if call.data == 'inv_manual':
+        safe_answer_callback(call.id, "Ввод вручную")
+        start_bulk_input(chat_id)
+    else:
+        safe_answer_callback(call.id, "Отправьте файл")
+        safe_send_message(chat_id, "📎 Отправьте PDF или фото инвойса")
+
 # ── Google Sheets ──────────────────────────────────────────────────────────────
 
 def fetch_invoices():
@@ -80,7 +123,7 @@ def fetch_invoices():
             for i, h in enumerate(headers):
                 if h not in d and i < len(raw):
                     d[h] = raw[i]
-            d['_raw'] = raw  # preserve all columns for document scanning
+            d['_raw'] = raw
             result.append(d)
         return result
     except Exception:
@@ -92,7 +135,14 @@ def clean_doc_name(name):
     return name.strip()
 
 def last_data_row(rows):
-    """Returns last row that has actual invoice data (non-empty Lot or Customer)."""
+    for row in reversed(rows):
+        cells = row.get('_raw', list(row.values()))
+        for cell in cells:
+            if isinstance(cell, str) and (
+                cell.startswith('https://drive.google.com/') or
+                cell.startswith('https://docs.google.com/')
+            ):
+                return row
     for row in reversed(rows):
         lot = row.get('Lot', '') or ''
         customer = row.get('Customer_Name', '') or ''
@@ -101,8 +151,6 @@ def last_data_row(rows):
     return rows[-1] if rows else None
 
 def get_doc_types_from_row(row):
-    """Returns list of (name, url) for all completed documents in a row."""
-    # Use _raw list to avoid losing duplicate-named columns
     cells = row.get('_raw', list(row.values())) if isinstance(row, dict) else row
     doc_types = []
     seen_urls = set()
@@ -142,7 +190,6 @@ def get_doc_types_from_row(row):
 # ── Google Drive download ──────────────────────────────────────────────────────
 
 def download_drive_file(url):
-    """Download file from Google Drive. Returns bytes if valid PDF, else None."""
     try:
         file_id = None
         is_doc = False
@@ -179,14 +226,12 @@ def download_drive_file(url):
         session = requests.Session()
         resp = session.get(dl_url, allow_redirects=True, timeout=60)
 
-        # Handle large file confirmation page
         if resp.status_code == 200 and b'%PDF' not in resp.content[:1024]:
             match = re.search(rb'confirm=([0-9A-Za-z_-]+)', resp.content)
             if match:
                 confirm = match.group(1).decode()
                 resp = session.get(f"{dl_url}&confirm={confirm}", allow_redirects=True, timeout=60)
 
-        # Validate it's actually a PDF
         if resp.status_code == 200 and b'%PDF' in resp.content[:1024]:
             return resp.content
 
@@ -195,7 +240,6 @@ def download_drive_file(url):
         return None
 
 def send_pdf_to_user(chat_id, name, url):
-    """Download PDF and send to user. Falls back to link if download fails."""
     safe_send_message(chat_id, f"Загружаю: <b>{name}</b>...", parse_mode='HTML')
     content = download_drive_file(url)
     if content:
@@ -206,7 +250,6 @@ def send_pdf_to_user(chat_id, name, url):
             return
         except Exception:
             pass
-    # Fallback: send link
     safe_send_message(chat_id, f"<b>{name}</b>\n{url}", parse_mode='HTML')
 
 # ── Document selector ──────────────────────────────────────────────────────────
@@ -234,9 +277,8 @@ def build_doctype_keyboard(doc_types, selected, lot_key=''):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     for i, (name, url) in enumerate(doc_types):
         check = '[x]' if i in selected else '[ ]'
-        short_name = name[:45]
         keyboard.add(types.InlineKeyboardButton(
-            text=f"{check} {short_name}",
+            text=f"{check} {name[:45]}",
             callback_data=f"dtoggle_{i}"
         ))
     keyboard.add(types.InlineKeyboardButton(
@@ -272,9 +314,9 @@ def handle_doctype_refresh(call):
         row = last_data_row(rows)
 
     vehicle = row.get('Vehicle', '') or ''
-    date = row.get('Date', '') or ''
-    lot = row.get('Lot', '') or ''
-    label = f"{vehicle} | {date}" if vehicle else date
+    date    = row.get('Date', '') or ''
+    lot     = row.get('Lot', '') or ''
+    label   = f"{vehicle} | {date}" if vehicle else date
     doc_types = get_doc_types_from_row(row)
 
     if chat_id not in user_state:
@@ -292,7 +334,8 @@ def handle_doctype_refresh(call):
             parse_mode='HTML'
         )
     except Exception:
-        safe_send_message(chat_id, f"📄 <b>{label}</b>\nВыберите нужные:", reply_markup=keyboard, parse_mode='HTML')
+        safe_send_message(chat_id, f"📄 <b>{label}</b>\nВыберите нужные:",
+                          reply_markup=keyboard, parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('dtoggle_'))
 def handle_doctype_toggle(call):
@@ -300,7 +343,7 @@ def handle_doctype_toggle(call):
     idx = int(call.data.split('_')[1])
 
     doc_types = user_state.get(chat_id, {}).get('current_doc_types', [])
-    selected = user_state.get(chat_id, {}).get('current_doc_selected', set())
+    selected  = user_state.get(chat_id, {}).get('current_doc_selected', set())
 
     if idx in selected:
         selected.discard(idx)
@@ -322,7 +365,7 @@ def handle_doctype_send_selected(call):
     safe_answer_callback(call.id, "Отправляю...")
 
     doc_types = user_state.get(chat_id, {}).get('current_doc_types', [])
-    selected = user_state.get(chat_id, {}).get('current_doc_selected', set())
+    selected  = user_state.get(chat_id, {}).get('current_doc_selected', set())
 
     if not selected:
         safe_send_message(chat_id, "Ничего не выбрано")
@@ -335,7 +378,7 @@ def handle_doctype_send_selected(call):
             time.sleep(0.5)
 
     user_state[chat_id]['current_doc_selected'] = set()
-    safe_send_message(chat_id, "Следующий инвойс?", reply_markup=next_invoice_keyboard())
+    safe_send_message(chat_id, "Следующий инвойс?", reply_markup=invoice_keyboard())
 
 @bot.callback_query_handler(func=lambda call: call.data == 'dtsendall')
 def handle_doctype_send_all(call):
@@ -351,30 +394,9 @@ def handle_doctype_send_all(call):
         send_pdf_to_user(chat_id, name, url)
         time.sleep(0.5)
 
-    safe_send_message(chat_id, "Следующий инвойс?", reply_markup=next_invoice_keyboard())
-
-# ── Buyer & customer ───────────────────────────────────────────────────────────
-
-def ask_buyer_selection(chat_id):
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    buttons = [types.InlineKeyboardButton(text=b, callback_data=f"buyer_{b}") for b in VALID_BUYERS]
-    keyboard.add(*buttons)
-    keyboard.add(types.InlineKeyboardButton(text="Другой номер", callback_data="buyer_other"))
-    safe_send_message(chat_id, "Выберите Buyer:", reply_markup=keyboard)
-    user_state[chat_id]['waiting_for'] = 'buyer_selection'
-
-def ask_customer_type(chat_id):
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("Постоянный", callback_data="customer_regular"),
-        types.InlineKeyboardButton("Новый", callback_data="customer_new")
-    )
-    safe_send_message(chat_id, "Тип клиента:", reply_markup=keyboard)
-    user_state[chat_id]['waiting_for'] = 'customer_type_selection'
+    safe_send_message(chat_id, "Следующий инвойс?", reply_markup=invoice_keyboard())
 
 # ── Google Form ────────────────────────────────────────────────────────────────
-
-GOOGLE_FORM_VIEW_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
 
 def submit_to_google_form(data):
     try:
@@ -392,12 +414,8 @@ def submit_to_google_form(data):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': GOOGLE_FORM_VIEW_URL,
         })
-
-        # Open form first to get session cookies
         session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
 
-        print(f"[FORM] Submitting to: {GOOGLE_FORM_SUBMIT_URL}")
-        print(f"[FORM] Data: {form_data}")
         response = session.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
@@ -405,7 +423,7 @@ def submit_to_google_form(data):
             allow_redirects=True,
             timeout=30
         )
-        print(f"[FORM] Status: {response.status_code}, URL after redirect: {response.url}")
+        print(f"[FORM] Status: {response.status_code}")
         return response.status_code in [200, 302]
     except Exception as e:
         print(f"[FORM] Exception: {e}")
@@ -434,77 +452,29 @@ def send_completion_message(chat_id, data):
         )
         safe_send_message(chat_id, msg, parse_mode='HTML')
 
-        lot = d.get('Lot', '')
+        lot     = d.get('Lot', '')
         vehicle = d.get('Vehicle', '')
 
         def send_reminder():
             time.sleep(120)
             rows = fetch_invoices()
             row = next((r for r in reversed(rows) if r.get('Lot', '').strip() == lot.strip()), None)
+            if not row:
+                row = last_data_row(rows)
             if row:
                 doc_types = get_doc_types_from_row(row)
                 label = f"{lot} | {vehicle}"
                 show_doc_type_selector(chat_id, label, doc_types, lot_key=lot)
             else:
-                safe_send_message(chat_id, f"Документы для лота <b>{lot}</b> — используйте /docs", parse_mode='HTML')
+                safe_send_message(chat_id, f"Документы для лота <b>{lot}</b> — используйте /docs",
+                                  parse_mode='HTML')
 
         threading.Thread(target=send_reminder, daemon=True).start()
 
     except Exception:
         safe_send_message(chat_id, "Ошибка")
 
-# ── Buyer callbacks ────────────────────────────────────────────────────────────
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('buyer_'))
-def handle_buyer_selection(call):
-    try:
-        chat_id = call.message.chat.id
-        if chat_id not in user_state or user_state[chat_id].get('waiting_for') != 'buyer_selection':
-            safe_answer_callback(call.id, "Ошибка")
-            return
-
-        buyer_val = call.data[len('buyer_'):]
-
-        if buyer_val == 'other':
-            safe_answer_callback(call.id, "Введите номер")
-            safe_send_message(chat_id, "Введите номер Buyer:")
-            user_state[chat_id]['waiting_for'] = 'Buyer_manual'
-        else:
-            user_state[chat_id]['data']['Buyer'] = buyer_val
-            safe_answer_callback(call.id, buyer_val)
-            safe_send_message(chat_id, f"Buyer: <b>{buyer_val}</b>", parse_mode='HTML')
-            time.sleep(0.5)
-            ask_customer_type(chat_id)
-    except Exception:
-        safe_answer_callback(call.id, "Ошибка")
-
-@bot.callback_query_handler(func=lambda call: call.data in ['customer_regular', 'customer_new'])
-def handle_customer_type_selection(call):
-    try:
-        chat_id = call.message.chat.id
-        if chat_id not in user_state or user_state[chat_id].get('waiting_for') != 'customer_type_selection':
-            return
-
-        if call.data == 'customer_regular':
-            user_state[chat_id]['data']['Customer_Name'] = REGULAR_CUSTOMER['name']
-            user_state[chat_id]['data']['Customer_ID'] = REGULAR_CUSTOMER['id']
-            safe_answer_callback(call.id, "Постоянный")
-            safe_send_message(
-                chat_id,
-                f"<b>{REGULAR_CUSTOMER['name']}</b>  |  ID: {REGULAR_CUSTOMER['id']}",
-                parse_mode='HTML'
-            )
-            time.sleep(0.5)
-            safe_send_message(chat_id, "Введите Auction Fee:")
-            user_state[chat_id]['waiting_for'] = 'Auction_Fee'
-        else:
-            safe_answer_callback(call.id, "Новый")
-            safe_send_message(chat_id, "Введите Customer Name:")
-            user_state[chat_id]['waiting_for'] = 'Customer_Name'
-    except Exception:
-        safe_answer_callback(call.id, "Ошибка")
-
-# ── /docs — последняя машина ───────────────────────────────────────────────────
+# ── /docs ──────────────────────────────────────────────────────────────────────
 
 @bot.message_handler(commands=['docs'])
 def handle_docs(message):
@@ -520,90 +490,13 @@ def handle_docs(message):
     if not row:
         safe_send_message(chat_id, "Нет данных в таблице")
         return
-    vehicle = row.get('Vehicle', '') or ''
-    date = row.get('Date', '') or ''
-    lot = row.get('Lot', '') or ''
 
-    label = f"{vehicle} | {date}" if vehicle else date
+    vehicle = row.get('Vehicle', '') or ''
+    date    = row.get('Date', '') or ''
+    lot     = row.get('Lot', '') or ''
+    label   = f"{vehicle} | {date}" if vehicle else date
     doc_types = get_doc_types_from_row(row)
     show_doc_type_selector(chat_id, label, doc_types, lot_key=lot or 'last')
-
-# ── /checkform — проверка актуальных entry ID ─────────────────────────────────
-
-@bot.message_handler(commands=['checkform'])
-def handle_checkform(message):
-    chat_id = message.chat.id
-    if chat_id not in authorized_users:
-        safe_send_message(chat_id, "🔒 Введите пароль:")
-        return
-    safe_send_message(chat_id, "Загружаю форму...")
-    try:
-        resp = requests.get(GOOGLE_FORM_VIEW_URL, timeout=15,
-                            headers={'User-Agent': 'Mozilla/5.0'})
-        html = resp.text
-
-        # Extract from FB_PUBLIC_LOAD_DATA_ — contains all field IDs
-        ids_from_data = re.findall(r'\[(\d{7,11}),', html)
-        ids_from_entry = re.findall(r'entry\.(\d+)', html)
-        all_ids = list(dict.fromkeys(ids_from_data + ids_from_entry))
-
-        # Filter: only IDs that look like entry IDs (7-11 digits)
-        all_ids = [i for i in all_ids if 7 <= len(i) <= 11]
-
-        safe_send_message(chat_id, f"Статус: {resp.status_code}\nURL: {resp.url}\n\nНайдено ID ({len(all_ids)}):\n" +
-                          "\n".join(f"entry.{e}" for e in all_ids[:30]))
-    except Exception as e:
-        safe_send_message(chat_id, f"Ошибка: {e}")
-
-# ── Bulk input helpers ─────────────────────────────────────────────────────────
-
-BULK_PROMPT = (
-    "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
-    "LOT\n"
-    "VIN\n"
-    "Авто (год марка модель)\n"
-    "Amount USD"
-)
-
-def start_bulk_input(chat_id):
-    now = datetime.now()
-    user_state[chat_id] = {
-        'data': {
-            'Date_Year': str(now.year),
-            'Date_Month': str(now.month),
-            'Date_Day': str(now.day)
-        },
-        'waiting_for': 'bulk_input'
-    }
-    safe_send_message(chat_id, BULK_PROMPT)
-
-def next_invoice_keyboard():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("📎 Загрузить файл", callback_data="next_upload"),
-        types.InlineKeyboardButton("✏️ Ввести вручную", callback_data="next_manual")
-    )
-    return keyboard
-
-@bot.callback_query_handler(func=lambda call: call.data in ['next_upload', 'next_manual'])
-def handle_next_invoice(call):
-    chat_id = call.message.chat.id
-    if call.data == 'next_manual':
-        safe_answer_callback(call.id, "Ввод вручную")
-        start_bulk_input(chat_id)
-    else:
-        safe_answer_callback(call.id, "Отправьте файл")
-        safe_send_message(chat_id, "📎 Отправьте PDF или фото инвойса")
-
-# ── /new — ручной ввод без файла ──────────────────────────────────────────────
-
-@bot.message_handler(commands=['new'])
-def handle_new(message):
-    chat_id = message.chat.id
-    if chat_id not in authorized_users:
-        safe_send_message(chat_id, "🔒 Введите пароль:")
-        return
-    start_bulk_input(chat_id)
 
 # ── File & text handlers ───────────────────────────────────────────────────────
 
@@ -613,15 +506,6 @@ def handle_file(message):
     if chat_id not in authorized_users:
         safe_send_message(chat_id, "🔒 Введите пароль:")
         return
-    now = datetime.now()
-    user_state[chat_id] = {
-        'data': {
-            'Date_Year': str(now.year),
-            'Date_Month': str(now.month),
-            'Date_Day': str(now.day)
-        },
-        'waiting_for': 'Lot'
-    }
     safe_send_message(chat_id, "Инвойс получен")
     start_bulk_input(chat_id)
 
@@ -635,16 +519,14 @@ def handle_text(message):
             safe_send_message(
                 chat_id,
                 "<b>Auto Invoice Bot</b>\n\n"
-                "Отправьте PDF или фото инвойса\n"
-                "/new — ввод без файла (вручную)\n"
-                "/docs — документы последней машины",
+                "Новый инвойс:",
+                reply_markup=invoice_keyboard(),
                 parse_mode='HTML'
             )
         else:
             safe_send_message(chat_id, "🔒 Введите пароль:")
         return
 
-    # Password check
     if chat_id not in authorized_users:
         if text == BOT_PASSWORD:
             authorized_users.add(chat_id)
@@ -652,8 +534,8 @@ def handle_text(message):
                 chat_id,
                 "✅ Доступ открыт\n\n"
                 "<b>Auto Invoice Bot</b>\n\n"
-                "Отправьте PDF или фото инвойса\n"
-                "/docs — документы последней машины",
+                "Новый инвойс:",
+                reply_markup=invoice_keyboard(),
                 parse_mode='HTML'
             )
         else:
@@ -661,78 +543,57 @@ def handle_text(message):
         return
 
     if chat_id not in user_state:
-        safe_send_message(chat_id, "Отправьте PDF или фото инвойса")
+        safe_send_message(chat_id, "Новый инвойс:", reply_markup=invoice_keyboard())
         return
 
     waiting = user_state[chat_id].get('waiting_for')
 
     if waiting == 'bulk_input':
         lines = [l.strip() for l in text.split('\n') if l.strip()]
-        if len(lines) < 4:
+        if len(lines) < 8:
             safe_send_message(
                 chat_id,
-                f"Нужно 4 строки, получено {len(lines)}. Попробуйте ещё раз:\n\n{BULK_PROMPT}"
+                f"Нужно 8 строк, получено {len(lines)}. Попробуйте ещё раз:\n\n{BULK_PROMPT}"
             )
             return
-        user_state[chat_id]['data']['Lot'] = lines[0]
-        user_state[chat_id]['data']['Vin'] = lines[1]
-        user_state[chat_id]['data']['Vehicle'] = lines[2]
-        user_state[chat_id]['data']['Amount_USD'] = lines[3]
+        try:
+            amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
+            fee    = float(lines[7].replace(',', '').replace(' ', ''))
+            total  = round(amount + fee, 2)
+        except ValueError:
+            safe_send_message(chat_id, "Amount и Auction Fee должны быть числами. Попробуйте ещё раз:\n\n" + BULK_PROMPT)
+            return
+
+        d = user_state[chat_id]['data']
+        d['Lot']           = lines[0]
+        d['Vin']           = lines[1]
+        d['Vehicle']       = lines[2]
+        d['Amount_USD']    = str(amount)
+        d['Buyer']         = lines[4]
+        d['Customer_Name'] = lines[5]
+        d['Customer_ID']   = lines[6]
+        d['Auction_Fee']   = str(fee)
+        d['Total_USD']     = str(total)
+
         safe_send_message(
             chat_id,
-            f"✅ LOT: <b>{lines[0]}</b>\n"
-            f"✅ VIN: <b>{lines[1]}</b>\n"
-            f"✅ Авто: <b>{lines[2]}</b>\n"
-            f"✅ Amount: <b>${lines[3]}</b>",
+            f"✅ LOT: <b>{d['Lot']}</b>\n"
+            f"✅ VIN: <b>{d['Vin']}</b>\n"
+            f"✅ Авто: <b>{d['Vehicle']}</b>\n"
+            f"💰 Amount: <b>${amount}</b>  |  Fee: <b>${fee}</b>  |  Total: <b>${total}</b>\n"
+            f"🏢 Buyer: <b>{d['Buyer']}</b>\n"
+            f"👤 {d['Customer_Name']}  |  {d['Customer_ID']}\n\n"
+            f"📤 Отправляю...",
             parse_mode='HTML'
         )
-        time.sleep(0.3)
-        ask_buyer_selection(chat_id)
 
-    elif waiting == 'Buyer_manual':
-        user_state[chat_id]['data']['Buyer'] = text
-        safe_send_message(chat_id, f"✅ Buyer: <b>{text}</b>", parse_mode='HTML')
-        time.sleep(0.5)
-        ask_customer_type(chat_id)
+        success = submit_to_google_form(d)
+        if success:
+            send_completion_message(chat_id, d)
+        else:
+            safe_send_message(chat_id, "Ошибка отправки в Google Form")
 
-    elif waiting == 'Customer_Name':
-        user_state[chat_id]['data']['Customer_Name'] = text
-        safe_send_message(chat_id, f"✅ Клиент: <b>{text}</b>\n\n🆔 Введите Customer ID:", parse_mode='HTML')
-        user_state[chat_id]['waiting_for'] = 'Customer_ID'
-
-    elif waiting == 'Customer_ID':
-        user_state[chat_id]['data']['Customer_ID'] = text
-        safe_send_message(chat_id, f"✅ ID: <b>{text}</b>\n\n💸 Введите Auction Fee:", parse_mode='HTML')
-        user_state[chat_id]['waiting_for'] = 'Auction_Fee'
-
-    elif waiting == 'Auction_Fee':
-        try:
-            fee = float(text.replace(',', '').replace(' ', ''))
-            amount = float(
-                user_state[chat_id]['data'].get('Amount_USD', '0')
-                .replace(',', '').replace('$', '').replace(' ', '')
-            )
-            total = round(amount + fee, 2)
-
-            user_state[chat_id]['data']['Auction_Fee'] = str(fee)
-            user_state[chat_id]['data']['Total_USD'] = str(total)
-
-            safe_send_message(
-                chat_id,
-                f"✅ Fee: <b>${fee}</b>  |  Total: <b>${total}</b>\n\n📤 Отправляю...",
-                parse_mode='HTML'
-            )
-
-            success = submit_to_google_form(user_state[chat_id]['data'])
-            if success:
-                send_completion_message(chat_id, user_state[chat_id]['data'])
-            else:
-                safe_send_message(chat_id, "Ошибка отправки в Google Form")
-
-            user_state.pop(chat_id, None)
-
-        except ValueError:
-            safe_send_message(chat_id, "Введите число, например: 625.00")
+        user_state.pop(chat_id, None)
 
 # ── Start ──────────────────────────────────────────────────────────────────────
 
