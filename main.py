@@ -19,7 +19,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
 SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
 
 VALID_BUYERS = ['169705', '657313', '218751', '218761']
@@ -378,9 +378,10 @@ def submit_to_google_form(data):
             for field, entry_id in GOOGLE_FORM_FIELDS.items()
             if field in data and data[field]
         }
-        # Required by Google Forms — without these the submission is silently dropped
         form_data['fvv'] = '1'
         form_data['fbzx'] = str(int(time.time() * 1000))
+        print(f"[FORM] Submitting to: {GOOGLE_FORM_SUBMIT_URL}")
+        print(f"[FORM] Data: {form_data}")
         response = requests.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
@@ -388,8 +389,10 @@ def submit_to_google_form(data):
             allow_redirects=True,
             timeout=30
         )
+        print(f"[FORM] Status: {response.status_code}, URL after redirect: {response.url}")
         return response.status_code in [200, 302]
-    except Exception:
+    except Exception as e:
+        print(f"[FORM] Exception: {e}")
         return False
 
 def send_completion_message(chat_id, data):
