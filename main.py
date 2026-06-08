@@ -525,6 +525,29 @@ def handle_docs(message):
     doc_types = get_doc_types_from_row(row)
     show_doc_type_selector(chat_id, label, doc_types, lot_key=lot or 'last')
 
+# ── /checkform — проверка актуальных entry ID ─────────────────────────────────
+
+@bot.message_handler(commands=['checkform'])
+def handle_checkform(message):
+    chat_id = message.chat.id
+    if chat_id not in authorized_users:
+        safe_send_message(chat_id, "🔒 Введите пароль:")
+        return
+    safe_send_message(chat_id, "Загружаю форму...")
+    try:
+        resp = requests.get(GOOGLE_FORM_VIEW_URL, timeout=15,
+                            headers={'User-Agent': 'Mozilla/5.0'})
+        html = resp.text
+        entries = re.findall(r'entry\.(\d+)', html)
+        unique = list(dict.fromkeys(entries))
+        if unique:
+            safe_send_message(chat_id, "Найденные entry ID в форме:\n" +
+                              "\n".join(f"entry.{e}" for e in unique))
+        else:
+            safe_send_message(chat_id, "entry ID не найдены. Возможно форма закрыта или недоступна.")
+    except Exception as e:
+        safe_send_message(chat_id, f"Ошибка: {e}")
+
 # ── /new — ручной ввод без файла ──────────────────────────────────────────────
 
 @bot.message_handler(commands=['new'])
