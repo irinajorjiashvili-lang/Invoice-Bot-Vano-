@@ -378,6 +378,9 @@ def submit_to_google_form(data):
             for field, entry_id in GOOGLE_FORM_FIELDS.items()
             if field in data and data[field]
         }
+        # Required by Google Forms — without these the submission is silently dropped
+        form_data['fvv'] = '1'
+        form_data['fbzx'] = str(int(time.time() * 1000))
         response = requests.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
@@ -385,7 +388,7 @@ def submit_to_google_form(data):
             allow_redirects=True,
             timeout=30
         )
-        return response.status_code in [200, 302, 400]
+        return response.status_code in [200, 302]
     except Exception:
         return False
 
