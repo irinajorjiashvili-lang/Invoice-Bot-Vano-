@@ -19,7 +19,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
 
 VALID_BUYERS = ['169705', '657313', '218751', '218761']
@@ -335,6 +335,7 @@ def handle_doctype_send_selected(call):
             time.sleep(0.5)
 
     user_state[chat_id]['current_doc_selected'] = set()
+    safe_send_message(chat_id, "Следующий инвойс?", reply_markup=next_invoice_keyboard())
 
 @bot.callback_query_handler(func=lambda call: call.data == 'dtsendall')
 def handle_doctype_send_all(call):
@@ -349,6 +350,8 @@ def handle_doctype_send_all(call):
     for name, url in doc_types:
         send_pdf_to_user(chat_id, name, url)
         time.sleep(0.5)
+
+    safe_send_message(chat_id, "Следующий инвойс?", reply_markup=next_invoice_keyboard())
 
 # ── Buyer & customer ───────────────────────────────────────────────────────────
 
@@ -371,7 +374,7 @@ def ask_customer_type(chat_id):
 
 # ── Google Form ────────────────────────────────────────────────────────────────
 
-GOOGLE_FORM_VIEW_URL = "https://docs.google.com/forms/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/viewform"
+GOOGLE_FORM_VIEW_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
 
 def submit_to_google_form(data):
     try:
@@ -552,6 +555,46 @@ def handle_checkform(message):
     except Exception as e:
         safe_send_message(chat_id, f"Ошибка: {e}")
 
+# ── Bulk input helpers ─────────────────────────────────────────────────────────
+
+BULK_PROMPT = (
+    "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
+    "LOT\n"
+    "VIN\n"
+    "Авто (год марка модель)\n"
+    "Amount USD"
+)
+
+def start_bulk_input(chat_id):
+    now = datetime.now()
+    user_state[chat_id] = {
+        'data': {
+            'Date_Year': str(now.year),
+            'Date_Month': str(now.month),
+            'Date_Day': str(now.day)
+        },
+        'waiting_for': 'bulk_input'
+    }
+    safe_send_message(chat_id, BULK_PROMPT)
+
+def next_invoice_keyboard():
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("📎 Загрузить файл", callback_data="next_upload"),
+        types.InlineKeyboardButton("✏️ Ввести вручную", callback_data="next_manual")
+    )
+    return keyboard
+
+@bot.callback_query_handler(func=lambda call: call.data in ['next_upload', 'next_manual'])
+def handle_next_invoice(call):
+    chat_id = call.message.chat.id
+    if call.data == 'next_manual':
+        safe_answer_callback(call.id, "Ввод вручную")
+        start_bulk_input(chat_id)
+    else:
+        safe_answer_callback(call.id, "Отправьте файл")
+        safe_send_message(chat_id, "📎 Отправьте PDF или фото инвойса")
+
 # ── /new — ручной ввод без файла ──────────────────────────────────────────────
 
 @bot.message_handler(commands=['new'])
@@ -560,16 +603,7 @@ def handle_new(message):
     if chat_id not in authorized_users:
         safe_send_message(chat_id, "🔒 Введите пароль:")
         return
-    now = datetime.now()
-    user_state[chat_id] = {
-        'data': {
-            'Date_Year': str(now.year),
-            'Date_Month': str(now.month),
-            'Date_Day': str(now.day)
-        },
-        'waiting_for': 'Lot'
-    }
-    safe_send_message(chat_id, "📝 Ручной ввод\n\nВведите LOT:")
+    start_bulk_input(chat_id)
 
 # ── File & text handlers ───────────────────────────────────────────────────────
 
@@ -588,7 +622,8 @@ def handle_file(message):
         },
         'waiting_for': 'Lot'
     }
-    safe_send_message(chat_id, "Инвойс получен\n\nВведите LOT:")
+    safe_send_message(chat_id, "Инвойс получен")
+    start_bulk_input(chat_id)
 
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
@@ -631,25 +666,27 @@ def handle_text(message):
 
     waiting = user_state[chat_id].get('waiting_for')
 
-    if waiting == 'Lot':
-        user_state[chat_id]['data']['Lot'] = text
-        safe_send_message(chat_id, f"✅ LOT: <b>{text}</b>\n\n🔢 Введите VIN:", parse_mode='HTML')
-        user_state[chat_id]['waiting_for'] = 'Vin'
-
-    elif waiting == 'Vin':
-        user_state[chat_id]['data']['Vin'] = text
-        safe_send_message(chat_id, f"✅ VIN: <b>{text}</b>\n\n🚙 Введите авто:", parse_mode='HTML')
-        user_state[chat_id]['waiting_for'] = 'Vehicle'
-
-    elif waiting == 'Vehicle':
-        user_state[chat_id]['data']['Vehicle'] = text
-        safe_send_message(chat_id, f"✅ Авто: <b>{text}</b>\n\n💰 Введите Amount USD:", parse_mode='HTML')
-        user_state[chat_id]['waiting_for'] = 'Amount_USD'
-
-    elif waiting == 'Amount_USD':
-        user_state[chat_id]['data']['Amount_USD'] = text
-        safe_send_message(chat_id, f"✅ Amount: <b>${text}</b>", parse_mode='HTML')
-        time.sleep(0.5)
+    if waiting == 'bulk_input':
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        if len(lines) < 4:
+            safe_send_message(
+                chat_id,
+                f"Нужно 4 строки, получено {len(lines)}. Попробуйте ещё раз:\n\n{BULK_PROMPT}"
+            )
+            return
+        user_state[chat_id]['data']['Lot'] = lines[0]
+        user_state[chat_id]['data']['Vin'] = lines[1]
+        user_state[chat_id]['data']['Vehicle'] = lines[2]
+        user_state[chat_id]['data']['Amount_USD'] = lines[3]
+        safe_send_message(
+            chat_id,
+            f"✅ LOT: <b>{lines[0]}</b>\n"
+            f"✅ VIN: <b>{lines[1]}</b>\n"
+            f"✅ Авто: <b>{lines[2]}</b>\n"
+            f"✅ Amount: <b>${lines[3]}</b>",
+            parse_mode='HTML'
+        )
+        time.sleep(0.3)
         ask_buyer_selection(chat_id)
 
     elif waiting == 'Buyer_manual':
