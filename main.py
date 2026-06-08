@@ -307,7 +307,11 @@ def handle_doctype_refresh(call):
         return
 
     if lot_key and lot_key != 'last':
-        row = next((r for r in reversed(rows) if r.get('Lot', '').strip() == lot_key.strip()), None)
+        row = next(
+            (r for r in reversed(rows)
+             if lot_key.strip() in [str(c).strip() for c in r.get('_raw', [])]),
+            None
+        )
         if not row:
             row = last_data_row(rows)
     else:
@@ -458,7 +462,11 @@ def send_completion_message(chat_id, data):
         def send_reminder():
             time.sleep(120)
             rows = fetch_invoices()
-            row = next((r for r in reversed(rows) if r.get('Lot', '').strip() == lot.strip()), None)
+            row = next(
+                (r for r in reversed(rows)
+                 if lot.strip() and lot.strip() in [str(c).strip() for c in r.get('_raw', [])]),
+                None
+            )
             if not row:
                 row = last_data_row(rows)
             if row:
