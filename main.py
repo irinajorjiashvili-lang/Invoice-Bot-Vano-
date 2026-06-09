@@ -21,7 +21,7 @@ authorized_users = set()
 
 GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
-SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
+SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
 
 REGULAR_CUSTOMER = {
     'name': 'ჰასანოვი მუქალდარ',
