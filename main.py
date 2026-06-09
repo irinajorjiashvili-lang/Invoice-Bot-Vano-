@@ -19,8 +19,8 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
-GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/formResponse"
+GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/viewform"
 SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
 
 REGULAR_CUSTOMER = {
