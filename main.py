@@ -3,6 +3,7 @@ import csv
 import io
 import re
 import json
+import base64
 import telebot
 from datetime import datetime
 from telebot import types
@@ -102,9 +103,9 @@ def get_google_services():
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/documents',
     ]
-    creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
-    if creds_json:
-        creds_info = json.loads(creds_json)
+    creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
+    if creds_b64:
+        creds_info = json.loads(base64.b64decode(creds_b64).decode('utf-8'))
         creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
     else:
         creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
