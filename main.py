@@ -106,12 +106,27 @@ def get_google_services():
         'https://www.googleapis.com/auth/documents',
         'https://www.googleapis.com/auth/spreadsheets',
     ]
-    creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
+    creds_info = None
+
+    creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64', '').strip()
     if creds_b64:
+        print(f'[AUTH] Using B64 credentials (len={len(creds_b64)})')
         creds_info = json.loads(base64.b64decode(creds_b64).decode('utf-8'))
+
+    if not creds_info:
+        creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON', '').strip()
+        if creds_json:
+            print(f'[AUTH] Using JSON credentials (len={len(creds_json)})')
+            creds_info = json.loads(creds_json)
+
+    if creds_info:
         creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
-    else:
+    elif os.path.exists(CREDENTIALS_FILE):
+        print(f'[AUTH] Using credentials.json file')
         creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+    else:
+        raise FileNotFoundError('No Google credentials found. Set GOOGLE_CREDENTIALS_B64 or GOOGLE_CREDENTIALS_JSON in Railway.')
+
     drive  = build('drive',  'v3', credentials=creds)
     docs   = build('docs',   'v1', credentials=creds)
     sheets = build('sheets', 'v4', credentials=creds)
