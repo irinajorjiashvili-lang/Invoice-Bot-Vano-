@@ -107,6 +107,7 @@ def get_google_services():
         'https://www.googleapis.com/auth/spreadsheets',
     ]
     creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
+    print(f'[AUTH] B64 found: {bool(creds_b64)}, len: {len(creds_b64) if creds_b64 else 0}')
     if creds_b64:
         creds_info = json.loads(base64.b64decode(creds_b64).decode('utf-8'))
         creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
