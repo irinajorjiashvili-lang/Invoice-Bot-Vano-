@@ -26,9 +26,9 @@ authorized_users = set()
 
 GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
-SHEETS_CSV_URL      = "https://docs.google.com/spreadsheets/d/1nyFIaaevA0RQ7u2uxphh8eqZoNWDCRm7QT9BDYWw5HA/export?format=csv&gid=0"
-SPREADSHEET_ID      = '1nyFIaaevA0RQ7u2uxphh8eqZoNWDCRm7QT9BDYWw5HA'
-RESPONSE_SHEET_GID  = 0
+SHEETS_CSV_URL     = "https://docs.google.com/spreadsheets/d/1nyFIaaevA0RQ7u2uxphh8eqZoNWDCRm7QT9BDYWw5HA/export?format=csv&gid=0"
+SPREADSHEET_ID     = '1nyFIaaevA0RQ7u2uxphh8eqZoNWDCRm7QT9BDYWw5HA'
+RESPONSE_SHEET_GID = 0
 
 CREDENTIALS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'credentials.json')
 
@@ -98,23 +98,9 @@ def safe_answer_callback(call_id, text, max_retries=3):
                 time.sleep(1)
     return None
 
-# ── Google Docs API ────────────────────────────────────────────────────────────
+# ── Google Services ────────────────────────────────────────────────────────────
 
-EMBEDDED_CREDS = {
-    "type": "service_account",
-    "project_id": "animated-sign-428717-g9",
-    "private_key_id": "ab5a6d1f9cef1f3b1c59e7eee8ce06afc958d364",
-    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDgY9khWr36lZxX\nMswc+WE6OB6p8cGzYv0BMd4SnnB6SqUHNFpDvdhOFMF/zTqjsMoF96F/GAXDzNbu\n7dGsOH/Cq+tD0x+Z2GrtLUSPq1Rp1s9x927jzPlV6Rs4XFWDPhA25o8s1iF0RuDp\nxvwznLNUqxI9GICiGM2zhLmnVXd2MEVsfXCNhPVZVBBWAZFd5fs9BJ7zE7bcaTfu\nwEAKLdjIQDk2HSilkx74GEqU3SmBgck8gN3bjF0OyRorbS0s5j5j8xUBNwr0CCcJ\nZ8ruYB1HQPd3TAlxPz/TUqePgvj2FFCsl614dU2Q4K9hSir4MHHLM87YEZC/X92b\nDy+sG5DJAgMBAAECggEABpyv8Bgs7fPiUf14tJ0ynL+87j67TvkVQdJBhs9CuuUf\n3Mj8T0UKWS6qZFox+/3VzibgYY7d00m3caicsOmkoMy7wi6389VukoOZeBmmg0yQ\nUKg9DRsOo9Xvy+bd9t/peWdXg7eMRSa2Mkf/SYQOEr93FPQiYjm/N1GAvlS55Z0e\nD6GfPUxPo74+cweVVVZ0SDbGskFSYnyPdVByElr8sCSHTeJtanW0CL03yVQhvmzc\nmPrEteM2NKb3wyYO8JSCyEYXn2EqOILcofr/ZnxsYyLNUxy2106/TDc9e6VU1JQK\nucqJGlimuH078P1xwItC2brgICK6olk8EBzDjQ0eCQKBgQD26GSx08hpCipC7nPI\nO/2Q6Wa6hEuGrAP7xbs3yhDYrWuRsGxjw4wNdEbSfDQ3yF2SK2iTKeDTVQjW8ow5\nXeThbV59dMb6YR3NJpEhr22SruNPJm/BU+q0kD0QvJ3c1g9LbBOuk1AwR4eR2DjZ\n86Jbordwe4QdygrPnygmFqyGbQKBgQDopy3n5ZBTH5xmKx+It7WbIae2vR+6JUR6\nMaYh+Ml1USFklvs1C646+GroGvfxGNZl4eBTRI85O+0lck1PdQYs+2nat51ulNlG\nkzII01SFknEVRXogHz2ebBXT8z4g7m+mEoEBRliEgwpy5eBebiOhgSPbsqB67IMc\nE/ai1AZqTQKBgDti7A1FhheVpVKR7fFEVJnNObM07MGIkDC3f29Mv76N/6h8CaX5\nO69kv0ATNbARFkh4/l8fHH9YHZctoYKOzeVWm/qK4u0H/NYCJ7g1bKJyRCQed5TF\nbVdetgFXjJS4O9eFODquHgRuv/HZUttBWVS3D24Tl1Re6zjC7DI1E+wFAoGAIQda\n5QkaLDLYqUiF+YrbJWLpxG+lCXAxAIf75ebD8vvJmdY1Y5p86bJKuxjZCklUZrJi\nfm/FRYLUb/SCNT2P2uL2bC6VExXeor5S5B3cafoYQ8TRSa4luU/u6WAm+dXf09vc\npKmv92ADI7yu1bkdJdiHlrENR2Y8Vsgew48GOiECgYEAuOE5EOMJivwTBBWJgrY3\nxtwdCb5k0JA6k8PEztSP1cAsS43NLGQsChit2BDG4iAgZGQTu8vjuaCrSKd3dgIV\nXhyWBYdoLypfuiXis0GH0ecMJ7iefQ/WKGI/sqyePQ17iD+xRnpmZvwrivfWQ/WY\nLuFUIQ1MoJ8A+S+nwtAVi7c=\n-----END PRIVATE KEY-----\n",
-    "client_email": "railway-bot@animated-sign-428717-g9.iam.gserviceaccount.com",
-    "client_id": "111519244222596518707",
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/railway-bot%40animated-sign-428717-g9.iam.gserviceaccount.com",
-    "universe_domain": "googleapis.com"
-}
-
-def get_credentials():
+def get_google_services():
     scopes = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/documents',
@@ -123,24 +109,18 @@ def get_credentials():
     creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
     if creds_b64:
         creds_info = json.loads(base64.b64decode(creds_b64).decode('utf-8'))
-        return service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
-    if os.path.exists(CREDENTIALS_FILE):
-        return service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
-    return service_account.Credentials.from_service_account_info(EMBEDDED_CREDS, scopes=scopes)
+        creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
+    else:
+        creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+    drive  = build('drive',  'v3', credentials=creds)
+    docs   = build('docs',   'v1', credentials=creds)
+    sheets = build('sheets', 'v4', credentials=creds)
+    return drive, docs, sheets
 
-def get_google_services():
-    creds = get_credentials()
-    drive = build('drive', 'v3', credentials=creds)
-    docs  = build('docs',  'v1', credentials=creds)
-    return drive, docs
-
-def get_sheets_service():
-    creds  = get_credentials()
-    return build('sheets', 'v4', credentials=creds)
+# ── Create Documents ───────────────────────────────────────────────────────────
 
 def create_documents(data):
     date_str = f"{data.get('Date_Day','')}.{data.get('Date_Month','')}.{data.get('Date_Year','')}"
-
     replacements = {
         'Lot':           data.get('Lot', ''),
         'Vehicle':       data.get('Vehicle', ''),
@@ -162,9 +142,8 @@ def create_documents(data):
         'Date_Month':    data.get('Date_Month', ''),
         'Date_Day':      data.get('Date_Day', ''),
     }
-
     try:
-        drive, docs_service = get_google_services()
+        drive, docs_service, _ = get_google_services()
     except Exception as e:
         print(f'[DOCS] Ошибка инициализации Google: {e}')
         return []
@@ -209,6 +188,8 @@ def create_documents(data):
 
     return results
 
+# ── Write to Sheets ────────────────────────────────────────────────────────────
+
 def col_letter(n):
     result = ''
     n += 1
@@ -219,7 +200,7 @@ def col_letter(n):
 
 def write_docs_to_sheet(doc_types):
     try:
-        sheets = get_sheets_service()
+        _, _, sheets = get_google_services()
 
         meta = sheets.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
         sheet_name = next(
@@ -302,7 +283,7 @@ def handle_invoice_choice(call):
         safe_answer_callback(call.id, "Отправьте файл")
         safe_send_message(chat_id, "📎 Отправьте PDF или фото инвойса")
 
-# ── Google Sheets (для /docs) ──────────────────────────────────────────────────
+# ── Google Sheets CSV ──────────────────────────────────────────────────────────
 
 def fetch_invoices():
     try:
@@ -349,7 +330,6 @@ def get_doc_types_from_row(row):
     cells = row.get('_raw', list(row.values())) if isinstance(row, dict) else row
     doc_types = []
     seen_urls = set()
-
     for i, value in enumerate(cells):
         value = (value or '').strip()
         if value in seen_urls:
@@ -358,28 +338,19 @@ def get_doc_types_from_row(row):
                 value.startswith('https://docs.google.com/')):
             continue
         seen_urls.add(value)
-
         name = None
         for j in range(1, 4):
             if i + j >= len(cells):
                 break
             candidate = (cells[i + j] or '').strip()
-            if (candidate
-                    and not candidate.startswith('http')
+            if (candidate and not candidate.startswith('http')
                     and 'Document successfully' not in candidate
-                    and 'Starting at' not in candidate
-                    and 'Run via' not in candidate
-                    and 'Timestamp:' not in candidate
-                    and len(candidate) >= 3
-                    and len(candidate) < 150):
+                    and len(candidate) >= 3 and len(candidate) < 150):
                 name = clean_doc_name(candidate)
                 break
-
         if not name:
             name = f"Document {len(doc_types) + 1}"
-
         doc_types.append((name, value))
-
     return doc_types
 
 # ── Google Drive download ──────────────────────────────────────────────────────
@@ -388,7 +359,6 @@ def download_drive_file(url):
     try:
         file_id = None
         is_doc = False
-
         if '/file/d/' in url:
             file_id = url.split('/file/d/')[1].split('/')[0].split('?')[0]
         elif '/document/d/' in url:
@@ -404,10 +374,8 @@ def download_drive_file(url):
             file_id = url.split('open?id=')[1].split('&')[0]
         elif 'id=' in url:
             file_id = url.split('id=')[1].split('&')[0]
-
         if not file_id:
             return None
-
         if is_doc:
             if '/spreadsheets/d/' in url:
                 dl_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=pdf"
@@ -417,19 +385,15 @@ def download_drive_file(url):
                 dl_url = f"https://docs.google.com/document/d/{file_id}/export?format=pdf"
         else:
             dl_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-
         session = requests.Session()
         resp = session.get(dl_url, allow_redirects=True, timeout=60)
-
         if resp.status_code == 200 and b'%PDF' not in resp.content[:1024]:
             match = re.search(rb'confirm=([0-9A-Za-z_-]+)', resp.content)
             if match:
                 confirm = match.group(1).decode()
                 resp = session.get(f"{dl_url}&confirm={confirm}", allow_redirects=True, timeout=60)
-
         if resp.status_code == 200 and b'%PDF' in resp.content[:1024]:
             return resp.content
-
         return None
     except Exception:
         return None
@@ -453,41 +417,26 @@ def show_doc_type_selector(chat_id, label, doc_types, lot_key=''):
     if not doc_types:
         safe_send_message(chat_id, "⏳ Документы ещё не готовы — попробуйте /docs через минуту")
         return
-
     if chat_id not in user_state:
         user_state[chat_id] = {}
     user_state[chat_id]['current_doc_types'] = doc_types
     user_state[chat_id]['current_doc_selected'] = set()
     user_state[chat_id]['current_lot_key'] = lot_key
-
     keyboard = build_doctype_keyboard(doc_types, set(), lot_key)
-    safe_send_message(
-        chat_id,
-        f"📄 <b>{label}</b>\nВыберите нужные:",
-        reply_markup=keyboard,
-        parse_mode='HTML'
-    )
+    safe_send_message(chat_id, f"📄 <b>{label}</b>\nВыберите нужные:",
+                      reply_markup=keyboard, parse_mode='HTML')
 
 def build_doctype_keyboard(doc_types, selected, lot_key=''):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     for i, (name, url) in enumerate(doc_types):
         check = '[x]' if i in selected else '[ ]'
         keyboard.add(types.InlineKeyboardButton(
-            text=f"{check} {name[:45]}",
-            callback_data=f"dtoggle_{i}"
+            text=f"{check} {name[:45]}", callback_data=f"dtoggle_{i}"
         ))
     keyboard.add(types.InlineKeyboardButton(
-        text=f"Отправить выбранные ({len(selected)})",
-        callback_data="dtsendsel"
-    ))
-    keyboard.add(types.InlineKeyboardButton(
-        text="Отправить все",
-        callback_data="dtsendall"
-    ))
-    keyboard.add(types.InlineKeyboardButton(
-        text="Обновить список",
-        callback_data=f"dtrefresh_{lot_key}"
-    ))
+        text=f"Отправить выбранные ({len(selected)})", callback_data="dtsendsel"))
+    keyboard.add(types.InlineKeyboardButton(text="Отправить все", callback_data="dtsendall"))
+    keyboard.add(types.InlineKeyboardButton(text="Обновить список", callback_data=f"dtrefresh_{lot_key}"))
     return keyboard
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('dtrefresh_'))
@@ -495,43 +444,31 @@ def handle_doctype_refresh(call):
     chat_id = call.message.chat.id
     lot_key = call.data[len('dtrefresh_'):]
     safe_answer_callback(call.id, "Обновляю...")
-
     rows = fetch_invoices()
     if not rows:
         safe_send_message(chat_id, "Не удалось загрузить данные")
         return
-
     if lot_key and lot_key != 'last':
-        row = next(
-            (r for r in reversed(rows)
-             if lot_key.strip() in [str(c).strip() for c in r.get('_raw', [])]),
-            None
-        )
+        row = next((r for r in reversed(rows)
+                    if lot_key.strip() in [str(c).strip() for c in r.get('_raw', [])]), None)
         if not row:
             row = last_data_row(rows)
     else:
         row = last_data_row(rows)
-
     vehicle = row.get('Vehicle', '') or ''
     date    = row.get('Date', '') or ''
     lot     = row.get('Lot', '') or ''
     label   = f"{vehicle} | {date}" if vehicle else date
     doc_types = get_doc_types_from_row(row)
-
     if chat_id not in user_state:
         user_state[chat_id] = {}
     user_state[chat_id]['current_doc_types'] = doc_types
     user_state[chat_id]['current_doc_selected'] = set()
     user_state[chat_id]['current_lot_key'] = lot_key
-
     keyboard = build_doctype_keyboard(doc_types, set(), lot_key)
     try:
-        bot.edit_message_text(
-            f"📄 <b>{label}</b>\nВыберите нужные: ({len(doc_types)} документов)",
-            chat_id, call.message.message_id,
-            reply_markup=keyboard,
-            parse_mode='HTML'
-        )
+        bot.edit_message_text(f"📄 <b>{label}</b>\nВыберите нужные: ({len(doc_types)} документов)",
+                              chat_id, call.message.message_id, reply_markup=keyboard, parse_mode='HTML')
     except Exception:
         safe_send_message(chat_id, f"📄 <b>{label}</b>\nВыберите нужные:",
                           reply_markup=keyboard, parse_mode='HTML')
@@ -540,21 +477,17 @@ def handle_doctype_refresh(call):
 def handle_doctype_toggle(call):
     chat_id = call.message.chat.id
     idx = int(call.data.split('_')[1])
-
     if chat_id not in user_state or 'current_doc_types' not in user_state.get(chat_id, {}):
         safe_answer_callback(call.id, "Сессия устарела — начните заново")
         return
-
-    doc_types = user_state.get(chat_id, {}).get('current_doc_types', [])
-    selected  = user_state.get(chat_id, {}).get('current_doc_selected', set())
-
+    doc_types = user_state[chat_id].get('current_doc_types', [])
+    selected  = user_state[chat_id].get('current_doc_selected', set())
     if idx in selected:
         selected.discard(idx)
         safe_answer_callback(call.id, "Снято")
     else:
         selected.add(idx)
         safe_answer_callback(call.id, "Выбрано")
-
     user_state[chat_id]['current_doc_selected'] = selected
     keyboard = build_doctype_keyboard(doc_types, selected)
     try:
@@ -566,20 +499,16 @@ def handle_doctype_toggle(call):
 def handle_doctype_send_selected(call):
     chat_id = call.message.chat.id
     safe_answer_callback(call.id, "Отправляю...")
-
     doc_types = user_state.get(chat_id, {}).get('current_doc_types', [])
     selected  = user_state.get(chat_id, {}).get('current_doc_selected', set())
-
     if not selected:
         safe_send_message(chat_id, "Ничего не выбрано")
         return
-
     for i in sorted(selected):
         if i < len(doc_types):
             name, url = doc_types[i]
             send_pdf_to_user(chat_id, name, url)
             time.sleep(0.5)
-
     user_state[chat_id]['current_doc_selected'] = set()
     safe_send_message(chat_id, "Следующий инвойс?", reply_markup=invoice_keyboard())
 
@@ -587,16 +516,13 @@ def handle_doctype_send_selected(call):
 def handle_doctype_send_all(call):
     chat_id = call.message.chat.id
     safe_answer_callback(call.id, "Отправляю все...")
-
     doc_types = user_state.get(chat_id, {}).get('current_doc_types', [])
     if not doc_types:
         safe_send_message(chat_id, "Документы не найдены")
         return
-
     for name, url in doc_types:
         send_pdf_to_user(chat_id, name, url)
         time.sleep(0.5)
-
     safe_send_message(chat_id, "Следующий инвойс?", reply_markup=invoice_keyboard())
 
 # ── Google Form ────────────────────────────────────────────────────────────────
@@ -611,14 +537,12 @@ def submit_to_google_form(data):
         form_data['fvv'] = '1'
         form_data['fbzx'] = str(int(time.time() * 1000))
         form_data['pageHistory'] = '0'
-
         session = requests.Session()
         session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': GOOGLE_FORM_VIEW_URL,
         })
         session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
-
         response = session.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
@@ -678,17 +602,14 @@ def send_completion_message(chat_id, data):
 def handle_docs(message):
     chat_id = message.chat.id
     safe_send_message(chat_id, "Загружаю...")
-
     rows = fetch_invoices()
     if not rows:
         safe_send_message(chat_id, "Не удалось загрузить данные")
         return
-
     row = last_data_row(rows)
     if not row:
         safe_send_message(chat_id, "Нет данных в таблице")
         return
-
     vehicle = row.get('Vehicle', '') or ''
     date    = row.get('Date', '') or ''
     lot     = row.get('Lot', '') or ''
@@ -714,13 +635,8 @@ def handle_text(message):
 
     if text.startswith('/start'):
         if chat_id in authorized_users:
-            safe_send_message(
-                chat_id,
-                "<b>Auto Invoice Bot</b>\n\n"
-                "Новый инвойс:",
-                reply_markup=invoice_keyboard(),
-                parse_mode='HTML'
-            )
+            safe_send_message(chat_id, "<b>Auto Invoice Bot</b>\n\nНовый инвойс:",
+                              reply_markup=invoice_keyboard(), parse_mode='HTML')
         else:
             safe_send_message(chat_id, "🔒 Введите пароль:")
         return
@@ -728,14 +644,9 @@ def handle_text(message):
     if chat_id not in authorized_users:
         if text == BOT_PASSWORD:
             authorized_users.add(chat_id)
-            safe_send_message(
-                chat_id,
-                "✅ Доступ открыт\n\n"
-                "<b>Auto Invoice Bot</b>\n\n"
-                "Новый инвойс:",
-                reply_markup=invoice_keyboard(),
-                parse_mode='HTML'
-            )
+            safe_send_message(chat_id,
+                              "✅ Доступ открыт\n\n<b>Auto Invoice Bot</b>\n\nНовый инвойс:",
+                              reply_markup=invoice_keyboard(), parse_mode='HTML')
         else:
             safe_send_message(chat_id, "❌ Неверный пароль. Попробуйте ещё раз:")
         return
@@ -749,10 +660,8 @@ def handle_text(message):
     if waiting == 'bulk_input':
         lines = [l.strip() for l in text.split('\n') if l.strip()]
         if len(lines) < 8:
-            safe_send_message(
-                chat_id,
-                f"Нужно 8 строк, получено {len(lines)}. Попробуйте ещё раз:\n\n{BULK_PROMPT}"
-            )
+            safe_send_message(chat_id,
+                              f"Нужно 8 строк, получено {len(lines)}. Попробуйте ещё раз:\n\n{BULK_PROMPT}")
             return
         try:
             amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
@@ -773,17 +682,15 @@ def handle_text(message):
         d['Auction_Fee']   = str(fee)
         d['Total_USD']     = str(total)
 
-        safe_send_message(
-            chat_id,
-            f"✅ LOT: <b>{d['Lot']}</b>\n"
-            f"✅ VIN: <b>{d['Vin']}</b>\n"
-            f"✅ Авто: <b>{d['Vehicle']}</b>\n"
-            f"💰 Amount: <b>${amount}</b>  |  Fee: <b>${fee}</b>  |  Total: <b>${total}</b>\n"
-            f"🏢 Buyer: <b>{d['Buyer']}</b>\n"
-            f"👤 {d['Customer_Name']}  |  {d['Customer_ID']}\n\n"
-            f"📤 Отправляю...",
-            parse_mode='HTML'
-        )
+        safe_send_message(chat_id,
+                          f"✅ LOT: <b>{d['Lot']}</b>\n"
+                          f"✅ VIN: <b>{d['Vin']}</b>\n"
+                          f"✅ Авто: <b>{d['Vehicle']}</b>\n"
+                          f"💰 Amount: <b>${amount}</b>  |  Fee: <b>${fee}</b>  |  Total: <b>${total}</b>\n"
+                          f"🏢 Buyer: <b>{d['Buyer']}</b>\n"
+                          f"👤 {d['Customer_Name']}  |  {d['Customer_ID']}\n\n"
+                          f"📤 Отправляю...",
+                          parse_mode='HTML')
 
         success = submit_to_google_form(d)
         if success:
