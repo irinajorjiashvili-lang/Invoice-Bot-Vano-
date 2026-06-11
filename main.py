@@ -26,7 +26,9 @@ authorized_users = set()
 
 GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
-SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
+SHEETS_CSV_URL      = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
+SPREADSHEET_ID      = '19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ'
+RESPONSE_SHEET_GID  = 1152025982
 
 CREDENTIALS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'credentials.json')
 
@@ -102,6 +104,7 @@ def get_google_services():
     scopes = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/documents',
+        'https://www.googleapis.com/auth/spreadsheets',
     ]
     creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
     if creds_b64:
@@ -109,9 +112,10 @@ def get_google_services():
         creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
     else:
         creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
-    drive = build('drive', 'v3', credentials=creds)
-    docs  = build('docs',  'v1', credentials=creds)
-    return drive, docs
+    drive  = build('drive',  'v3', credentials=creds)
+    docs   = build('docs',   'v1', credentials=creds)
+    sheets = build('sheets', 'v4', credentials=creds)
+    return drive, docs, sheets
 
 def create_documents(data):
     date_str = f"{data.get('Date_Day','')}.{data.get('Date_Month','')}.{data.get('Date_Year','')}"
@@ -139,7 +143,7 @@ def create_documents(data):
     }
 
     try:
-        drive, docs_service = get_google_services()
+        drive, docs_service, _ = get_google_services()
     except Exception as e:
         print(f'[DOCS] Ошибка инициализации Google: {e}')
         return []
@@ -183,6 +187,67 @@ def create_documents(data):
             print(f'[DOCS] Ошибка шаблона {template_id}: {e}')
 
     return results
+
+def col_letter(n):
+    result = ''
+    n += 1
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        result = chr(ord('A') + r) + result
+    return result
+
+def write_docs_to_sheet(doc_types):
+    try:
+        _, _, sheets = get_google_services()
+
+        meta = sheets.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
+        sheet_name = next(
+            (s['properties']['title'] for s in meta['sheets']
+             if s['properties']['sheetId'] == RESPONSE_SHEET_GID),
+            None
+        )
+        if not sheet_name:
+            print('[SHEETS] Вкладка не найдена')
+            return
+
+        hdrs = sheets.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"'{sheet_name}'!1:1"
+        ).execute().get('values', [[]])[0]
+
+        link_start = len(hdrs)
+        for i, h in enumerate(hdrs):
+            if not str(h).strip() or str(h).strip().lower().startswith('link'):
+                link_start = i
+                break
+
+        col_a = sheets.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"'{sheet_name}'!A:A"
+        ).execute().get('values', [])
+        last_row = len(col_a)
+        if last_row <= 1:
+            print('[SHEETS] Нет данных')
+            return
+
+        values_row = [[
+            f'=HYPERLINK("{url}","{name.replace(chr(34), chr(39))}")'
+            for name, url in doc_types
+        ]]
+        start = col_letter(link_start)
+        end   = col_letter(link_start + len(doc_types) - 1)
+
+        sheets.spreadsheets().values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"'{sheet_name}'!{start}{last_row}:{end}{last_row}",
+            valueInputOption='USER_ENTERED',
+            body={'values': values_row}
+        ).execute()
+
+        print(f'[SHEETS] Записано {len(doc_types)} ссылок в строку {last_row}')
+
+    except Exception as e:
+        print(f'[SHEETS] Ошибка: {e}')
 
 # ── Invoice start keyboard ─────────────────────────────────────────────────────
 
@@ -455,6 +520,10 @@ def handle_doctype_toggle(call):
     chat_id = call.message.chat.id
     idx = int(call.data.split('_')[1])
 
+    if chat_id not in user_state or 'current_doc_types' not in user_state.get(chat_id, {}):
+        safe_answer_callback(call.id, "Сессия устарела — начните заново")
+        return
+
     doc_types = user_state.get(chat_id, {}).get('current_doc_types', [])
     selected  = user_state.get(chat_id, {}).get('current_doc_selected', set())
 
@@ -571,6 +640,7 @@ def send_completion_message(chat_id, data):
         def generate_docs():
             doc_types = create_documents(d)
             if doc_types:
+                write_docs_to_sheet(doc_types)
                 label = f"{lot} | {vehicle}"
                 show_doc_type_selector(chat_id, label, doc_types, lot_key=lot)
             else:
