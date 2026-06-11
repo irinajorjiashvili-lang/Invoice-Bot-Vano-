@@ -100,6 +100,20 @@ def safe_answer_callback(call_id, text, max_retries=3):
 
 # ── Google Docs API ────────────────────────────────────────────────────────────
 
+EMBEDDED_CREDS = {
+    "type": "service_account",
+    "project_id": "animated-sign-428717-g9",
+    "private_key_id": "ab5a6d1f9cef1f3b1c59e7eee8ce06afc958d364",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDgY9khWr36lZxX\nMswc+WE6OB6p8cGzYv0BMd4SnnB6SqUHNFpDvdhOFMF/zTqjsMoF96F/GAXDzNbu\n7dGsOH/Cq+tD0x+Z2GrtLUSPq1Rp1s9x927jzPlV6Rs4XFWDPhA25o8s1iF0RuDp\nxvwznLNUqxI9GICiGM2zhLmnVXd2MEVsfXCNhPVZVBBWAZFd5fs9BJ7zE7bcaTfu\nwEAKLdjIQDk2HSilkx74GEqU3SmBgck8gN3bjF0OyRorbS0s5j5j8xUBNwr0CCcJ\nZ8ruYB1HQPd3TAlxPz/TUqePgvj2FFCsl614dU2Q4K9hSir4MHHLM87YEZC/X92b\nDy+sG5DJAgMBAAECggEABpyv8Bgs7fPiUf14tJ0ynL+87j67TvkVQdJBhs9CuuUf\n3Mj8T0UKWS6qZFox+/3VzibgYY7d00m3caicsOmkoMy7wi6389VukoOZeBmmg0yQ\nUKg9DRsOo9Xvy+bd9t/peWdXg7eMRSa2Mkf/SYQOEr93FPQiYjm/N1GAvlS55Z0e\nD6GfPUxPo74+cweVVVZ0SDbGskFSYnyPdVByElr8sCSHTeJtanW0CL03yVQhvmzc\nmPrEteM2NKb3wyYO8JSCyEYXn2EqOILcofr/ZnxsYyLNUxy2106/TDc9e6VU1JQK\nucqJGlimuH078P1xwItC2brgICK6olk8EBzDjQ0eCQKBgQD26GSx08hpCipC7nPI\nO/2Q6Wa6hEuGrAP7xbs3yhDYrWuRsGxjw4wNdEbSfDQ3yF2SK2iTKeDTVQjW8ow5\nXeThbV59dMb6YR3NJpEhr22SruNPJm/BU+q0kD0QvJ3c1g9LbBOuk1AwR4eR2DjZ\n86Jbordwe4QdygrPnygmFqyGbQKBgQDopy3n5ZBTH5xmKx+It7WbIae2vR+6JUR6\nMaYh+Ml1USFklvs1C646+GroGvfxGNZl4eBTRI85O+0lck1PdQYs+2nat51ulNlG\nkzII01SFknEVRXogHz2ebBXT8z4g7m+mEoEBRliEgwpy5eBebiOhgSPbsqB67IMc\nE/ai1AZqTQKBgDti7A1FhheVpVKR7fFEVJnNObM07MGIkDC3f29Mv76N/6h8CaX5\nO69kv0ATNbARFkh4/l8fHH9YHZctoYKOzeVWm/qK4u0H/NYCJ7g1bKJyRCQed5TF\nbVdetgFXjJS4O9eFODquHgRuv/HZUttBWVS3D24Tl1Re6zjC7DI1E+wFAoGAIQda\n5QkaLDLYqUiF+YrbJWLpxG+lCXAxAIf75ebD8vvJmdY1Y5p86bJKuxjZCklUZrJi\nfm/FRYLUb/SCNT2P2uL2bC6VExXeor5S5B3cafoYQ8TRSa4luU/u6WAm+dXf09vc\npKmv92ADI7yu1bkdJdiHlrENR2Y8Vsgew48GOiECgYEAuOE5EOMJivwTBBWJgrY3\nxtwdCb5k0JA6k8PEztSP1cAsS43NLGQsChit2BDG4iAgZGQTu8vjuaCrSKd3dgIV\nXhyWBYdoLypfuiXis0GH0ecMJ7iefQ/WKGI/sqyePQ17iD+xRnpmZvwrivfWQ/WY\nLuFUIQ1MoJ8A+S+nwtAVi7c=\n-----END PRIVATE KEY-----\n",
+    "client_email": "railway-bot@animated-sign-428717-g9.iam.gserviceaccount.com",
+    "client_id": "111519244222596518707",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/railway-bot%40animated-sign-428717-g9.iam.gserviceaccount.com",
+    "universe_domain": "googleapis.com"
+}
+
 def get_credentials():
     scopes = [
         'https://www.googleapis.com/auth/drive',
@@ -107,11 +121,12 @@ def get_credentials():
         'https://www.googleapis.com/auth/spreadsheets',
     ]
     creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
-    print(f'[AUTH] B64 found: {bool(creds_b64)}, len: {len(creds_b64) if creds_b64 else 0}')
     if creds_b64:
         creds_info = json.loads(base64.b64decode(creds_b64).decode('utf-8'))
         return service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
-    return service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+    if os.path.exists(CREDENTIALS_FILE):
+        return service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+    return service_account.Credentials.from_service_account_info(EMBEDDED_CREDS, scopes=scopes)
 
 def get_google_services():
     creds = get_credentials()
