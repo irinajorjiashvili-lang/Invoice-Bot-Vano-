@@ -26,9 +26,9 @@ authorized_users = set()
 
 GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
-SHEETS_CSV_URL      = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
-SPREADSHEET_ID      = '19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ'
-RESPONSE_SHEET_GID  = 1152025982
+SHEETS_CSV_URL      = "https://docs.google.com/spreadsheets/d/1nyFIaaevA0RQ7u2uxphh8eqZoNWDCRm7QT9BDYWw5HA/export?format=csv&gid=0"
+SPREADSHEET_ID      = '1nyFIaaevA0RQ7u2uxphh8eqZoNWDCRm7QT9BDYWw5HA'
+RESPONSE_SHEET_GID  = 0
 
 CREDENTIALS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'credentials.json')
 
@@ -100,7 +100,7 @@ def safe_answer_callback(call_id, text, max_retries=3):
 
 # ── Google Docs API ────────────────────────────────────────────────────────────
 
-def get_google_services():
+def get_credentials():
     scopes = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/documents',
@@ -110,13 +110,18 @@ def get_google_services():
     print(f'[AUTH] B64 found: {bool(creds_b64)}, len: {len(creds_b64) if creds_b64 else 0}')
     if creds_b64:
         creds_info = json.loads(base64.b64decode(creds_b64).decode('utf-8'))
-        creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
-    else:
-        creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
-    drive  = build('drive',  'v3', credentials=creds)
-    docs   = build('docs',   'v1', credentials=creds)
-    sheets = build('sheets', 'v4', credentials=creds)
-    return drive, docs, sheets
+        return service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
+    return service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+
+def get_google_services():
+    creds = get_credentials()
+    drive = build('drive', 'v3', credentials=creds)
+    docs  = build('docs',  'v1', credentials=creds)
+    return drive, docs
+
+def get_sheets_service():
+    creds  = get_credentials()
+    return build('sheets', 'v4', credentials=creds)
 
 def create_documents(data):
     date_str = f"{data.get('Date_Day','')}.{data.get('Date_Month','')}.{data.get('Date_Year','')}"
@@ -144,7 +149,7 @@ def create_documents(data):
     }
 
     try:
-        drive, docs_service, _ = get_google_services()
+        drive, docs_service = get_google_services()
     except Exception as e:
         print(f'[DOCS] Ошибка инициализации Google: {e}')
         return []
@@ -199,7 +204,7 @@ def col_letter(n):
 
 def write_docs_to_sheet(doc_types):
     try:
-        _, _, sheets = get_google_services()
+        sheets = get_sheets_service()
 
         meta = sheets.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
         sheet_name = next(
