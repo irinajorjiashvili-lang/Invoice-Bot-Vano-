@@ -17,6 +17,10 @@ from googleapiclient.discovery import build
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 print("Bot starting...")
+_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64', '')
+_jsn = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')
+print(f'[STARTUP] B64 len={len(_b64)} JSON len={len(_jsn)}')
+print(f'[STARTUP] All env keys: {[k for k in os.environ.keys() if "GOOGLE" in k or "CRED" in k]}')
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8760516717:AAFjIvQTVgWIM2wJQVlRBEped4rM6fAakLM')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
