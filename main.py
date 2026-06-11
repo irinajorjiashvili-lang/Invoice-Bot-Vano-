@@ -48,7 +48,7 @@ TEMPLATE_IDS = [
     '10tb-Ms9yHw6SEb6upGBpDmjh-efoOV_79_WzG_2USxE',
     '1FHHGyei-It1hciPJvyPUAHb81NpjLJl2y-dlugmZfig',
 ]
-OUTPUT_FOLDER_ID = '1BCHOpuxgl-f1J38S_A-Cxdp-SxPMpebm'
+OUTPUT_FOLDER_ID = '16TbdEUM8qYdxzYC7heUwe6vIXJQV2wEK'
 
 REGULAR_CUSTOMER = {
     'name': 'ჰასანოვი მუქალდარ',
