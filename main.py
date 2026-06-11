@@ -2,12 +2,16 @@ import os
 import csv
 import io
 import re
+import json
 import telebot
 from datetime import datetime
 from telebot import types
 import requests
 import time
 import threading
+
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
@@ -19,9 +23,25 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/formResponse"
-GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/viewform"
-SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
+GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
+SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/19UUm74QdfeZtFsQoTf-X77h7brpIQ9_hAS0GreNidoQ/export?format=csv&gid=1152025982"
+
+CREDENTIALS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'credentials.json')
+
+TEMPLATE_IDS = [
+    '1b00INgqdIkWcGWKK7c1MmbXnhnJ-zsHw-iINL_3ZVLA',
+    '1v1o8JTBg0ROEqPKXskYxrE_VrwBs1NW-bTLZC3xgzFc',
+    '1sH2hJx3DJ6Ll3YVNDeVVAbhyTS96IVHxwpM1zhq-YY4',
+    '1YSIyov6jTHWtTwrvcJXaZkxUBHLW4Rqlz7n51TlLBg0',
+    '1wlSM2WIe-jOeT1ZHqUjp5Lr2Pw5tXG7f232dqvlNamI',
+    '1D5oELPwMBHEgsQ6y425y7LVe-28vU-3hnVzzAvLTINo',
+    '1hxf2_N-JDDByzy3Ea1YJ2pfbqnVXuAWIIyPxOl5OkDs',
+    '17sLRKKoRGUnj5Vsw53JC0O83uX8ylzjyZI7jqChOMb0',
+    '10tb-Ms9yHw6SEb6upGBpDmjh-efoOV_79_WzG_2USxE',
+    '1FHHGyei-It1hciPJvyPUAHb81NpjLJl2y-dlugmZfig',
+]
+OUTPUT_FOLDER_ID = '1BCHOpuxgl-f1J38S_A-Cxdp-SxPMpebm'
 
 REGULAR_CUSTOMER = {
     'name': 'ჰასანოვი მუქალდარ',
@@ -75,6 +95,94 @@ def safe_answer_callback(call_id, text, max_retries=3):
                 time.sleep(1)
     return None
 
+# ── Google Docs API ────────────────────────────────────────────────────────────
+
+def get_google_services():
+    scopes = [
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/documents',
+    ]
+    creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+    if creds_json:
+        creds_info = json.loads(creds_json)
+        creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
+    else:
+        creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+    drive = build('drive', 'v3', credentials=creds)
+    docs  = build('docs',  'v1', credentials=creds)
+    return drive, docs
+
+def create_documents(data):
+    date_str = f"{data.get('Date_Day','')}.{data.get('Date_Month','')}.{data.get('Date_Year','')}"
+
+    replacements = {
+        'Lot':           data.get('Lot', ''),
+        'Vehicle':       data.get('Vehicle', ''),
+        'Vin':           data.get('Vin', ''),
+        'VIN':           data.get('Vin', ''),
+        'Amount_USD':    data.get('Amount_USD', ''),
+        'Amount USD':    data.get('Amount_USD', ''),
+        'Auction_Fee':   data.get('Auction_Fee', ''),
+        'Auction Fee':   data.get('Auction_Fee', ''),
+        'Total_USD':     data.get('Total_USD', ''),
+        'Total USD':     data.get('Total_USD', ''),
+        'Customer_Name': data.get('Customer_Name', ''),
+        'Customer Name': data.get('Customer_Name', ''),
+        'Customer_ID':   data.get('Customer_ID', ''),
+        'Customer ID':   data.get('Customer_ID', ''),
+        'Buyer':         data.get('Buyer', ''),
+        'Date':          date_str,
+        'Date_Year':     data.get('Date_Year', ''),
+        'Date_Month':    data.get('Date_Month', ''),
+        'Date_Day':      data.get('Date_Day', ''),
+    }
+
+    try:
+        drive, docs_service = get_google_services()
+    except Exception as e:
+        print(f'[DOCS] Ошибка инициализации Google: {e}')
+        return []
+
+    results = []
+    for template_id in TEMPLATE_IDS:
+        try:
+            template_meta = drive.files().get(fileId=template_id, fields='name').execute()
+            template_name = template_meta['name']
+
+            copy_meta = drive.files().copy(
+                fileId=template_id,
+                body={'name': '_tmp_', 'parents': [OUTPUT_FOLDER_ID]}
+            ).execute()
+            copy_id = copy_meta['id']
+
+            requests_list = [
+                {
+                    'replaceAllText': {
+                        'containsText': {'text': f'<<{key}>>', 'matchCase': True},
+                        'replaceText': str(val)
+                    }
+                }
+                for key, val in replacements.items()
+            ]
+            docs_service.documents().batchUpdate(
+                documentId=copy_id,
+                body={'requests': requests_list}
+            ).execute()
+
+            final_name = template_name
+            for key, val in replacements.items():
+                final_name = final_name.replace(f'<<{key}>>', str(val))
+            drive.files().update(fileId=copy_id, body={'name': final_name}).execute()
+
+            url = f'https://docs.google.com/document/d/{copy_id}/view'
+            results.append((final_name, url))
+            print(f'[DOCS] Создан: {final_name}')
+
+        except Exception as e:
+            print(f'[DOCS] Ошибка шаблона {template_id}: {e}')
+
+    return results
+
 # ── Invoice start keyboard ─────────────────────────────────────────────────────
 
 def invoice_keyboard():
@@ -107,7 +215,7 @@ def handle_invoice_choice(call):
         safe_answer_callback(call.id, "Отправьте файл")
         safe_send_message(chat_id, "📎 Отправьте PDF или фото инвойса")
 
-# ── Google Sheets ──────────────────────────────────────────────────────────────
+# ── Google Sheets (для /docs) ──────────────────────────────────────────────────
 
 def fetch_invoices():
     try:
@@ -452,32 +560,22 @@ def send_completion_message(chat_id, data):
             f"💸 Fee: ${d.get('Auction_Fee', '—')}\n"
             f"💵 Total: ${d.get('Total_USD', '—')}\n"
             "──────────────────\n"
-            "⏳ Документы будут готовы через ~2 минуты"
+            "⏳ Создаю документы..."
         )
         safe_send_message(chat_id, msg, parse_mode='HTML')
 
         lot     = d.get('Lot', '')
         vehicle = d.get('Vehicle', '')
 
-        def send_reminder():
-            time.sleep(120)
-            rows = fetch_invoices()
-            row = next(
-                (r for r in reversed(rows)
-                 if lot.strip() and lot.strip() in [str(c).strip() for c in r.get('_raw', [])]),
-                None
-            )
-            if not row:
-                row = last_data_row(rows)
-            if row:
-                doc_types = get_doc_types_from_row(row)
+        def generate_docs():
+            doc_types = create_documents(d)
+            if doc_types:
                 label = f"{lot} | {vehicle}"
                 show_doc_type_selector(chat_id, label, doc_types, lot_key=lot)
             else:
-                safe_send_message(chat_id, f"Документы для лота <b>{lot}</b> — используйте /docs",
-                                  parse_mode='HTML')
+                safe_send_message(chat_id, "❌ Не удалось создать документы. Попробуйте /docs")
 
-        threading.Thread(target=send_reminder, daemon=True).start()
+        threading.Thread(target=generate_docs, daemon=True).start()
 
     except Exception:
         safe_send_message(chat_id, "Ошибка")
