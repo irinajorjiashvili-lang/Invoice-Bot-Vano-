@@ -10,7 +10,7 @@ import threading
 os.environ['PYTHONUNBUFFERED'] = '1'
 print("🚀 Auto Invoice Bot starting...")
 
-BOT_TOKEN  = os.environ.get('BOT_TOKEN', '8760516717:AAEmEESz8YxnqEnBIOrHKk5-n8Hns5L8wVA')
+BOT_TOKEN  = os.environ.get('BOT_TOKEN', '8760516717:AAH6q12ZZZujNdW6XQh8aigZGVOO4fUSQwo')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
@@ -20,7 +20,9 @@ GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 GOOGLE_FORM_FIELDS = {
-    'Date':          'entry.2136135204',
+    'Date_Year':     'entry.2136135204_year',
+    'Date_Month':    'entry.2136135204_month',
+    'Date_Day':      'entry.2136135204_day',
     'Customer_Name': 'entry.21018057',
     'Customer_ID':   'entry.1116307930',
     'Lot':           'entry.1163357354',
@@ -94,7 +96,7 @@ def submit_to_google_form(data):
 def send_completion(chat_id, data):
     msg = (
         "✅ Отправлено\n\n"
-        f"📅 {data['Date']}\n"
+        f"📅 {data['Date_Day']}.{data['Date_Month']}.{data['Date_Year']}\n"
         f"🚗 Lot: {data['Lot']}\n"
         f"🔢 VIN: {data['Vin']}\n"
         f"🚙 {data['Vehicle']}\n"
@@ -126,8 +128,11 @@ def parse_bulk(lines):
     try:
         amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
         fee    = float(lines[7].replace(',', '').replace(' ', ''))
+        now = datetime.now()
         return {
-            'Date':          datetime.now().strftime('%Y-%m-%d'),
+            'Date_Year':     str(now.year),
+            'Date_Month':    str(now.month),
+            'Date_Day':      str(now.day),
             'Lot':           lines[0],
             'Vin':           lines[1],
             'Vehicle':       lines[2],
