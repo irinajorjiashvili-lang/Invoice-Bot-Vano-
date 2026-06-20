@@ -14,7 +14,7 @@ BOT_TOKEN = '8760516717:AAH6q12ZZZujNdW6XQh8aigZGVOO4fUSQwo'
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzrOdGbY38wasdvBFfcfez-FwwjSPJj1_Rcl1cHB3D4pXsPzqhOCy8qQxwrIfeKSIeY8Q/exec"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 VALID_BUYERS = ['169705', '657313', '218751', '218761']
@@ -22,6 +22,21 @@ VALID_BUYERS = ['169705', '657313', '218751', '218761']
 REGULAR_CUSTOMER = {
     'name': 'ჰასანოვი მუქალდარ',
     'id': '28001088898'
+}
+
+GOOGLE_FORM_FIELDS = {
+    'Date_Year':     'entry.2136135204_year',
+    'Date_Month':    'entry.2136135204_month',
+    'Date_Day':      'entry.2136135204_day',
+    'Customer_Name': 'entry.21018057',
+    'Customer_ID':   'entry.1116307930',
+    'Lot':           'entry.1163357354',
+    'Vehicle':       'entry.341377459',
+    'Vin':           'entry.1094744061',
+    'Amount_USD':    'entry.1342000086',
+    'Auction_Fee':   'entry.532543637',
+    'Total_USD':     'entry.857168306',
+    'Buyer':         'entry.784567376'
 }
 
 
@@ -48,14 +63,6 @@ def safe_answer_callback(call_id, text, max_retries=3):
             else:
                 return None
 
-def ask_input_method(chat_id):
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(
-        types.InlineKeyboardButton("✏️ Ручной ввод", callback_data="input_manual"),
-        types.InlineKeyboardButton("📄 Загрузка PDF", callback_data="input_pdf")
-    )
-    safe_send_message(chat_id, "Выберите способ ввода:", reply_markup=keyboard)
-
 def ask_buyer_selection(chat_id):
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     for buyer_id in VALID_BUYERS:
@@ -77,48 +84,28 @@ def ask_customer_type(chat_id):
 
 def submit_to_google_form(data):
     try:
-        form_data = {
-            'year':         data.get('Date_Year', ''),
-            'month':        data.get('Date_Month', ''),
-            'day':          data.get('Date_Day', ''),
-            'customer_name': data.get('Customer_Name', ''),
-            'customer_id':  data.get('Customer_ID', ''),
-            'buyer':        data.get('Buyer', ''),
-            'lot':          data.get('Lot', ''),
-            'vehicle':      data.get('Vehicle', ''),
-            'vin':          data.get('Vin', ''),
-            'amount_usd':   data.get('Amount_USD', ''),
-            'auction_fee':  data.get('Auction_Fee', ''),
-            'total_usd':    data.get('Total_USD', ''),
+        form_data = {}
+        for field, entry_id in GOOGLE_FORM_FIELDS.items():
+            if field in data and data[field]:
+                form_data[entry_id] = str(data[field])
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded'
         }
 
-        print(f"[DEBUG] Отправляю данные: {form_data}")
         response = requests.post(
-            WEBAPP_URL,
+            GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
-            timeout=10
+            headers=headers,
+            allow_redirects=True,
+            timeout=15
         )
-        print(f"[DEBUG] HTTP статус: {response.status_code}")
-        print(f"[DEBUG] Content-Type: {response.headers.get('Content-Type', 'нет')}")
-        print(f"[DEBUG] Ответ: {response.text[:1000]}")
-
-        content_type = response.headers.get('Content-Type', '')
-        if 'application/json' not in content_type:
-            return False, f"HTTP {response.status_code}: ответ не JSON.\n{response.text[:300]}"
-
-        result = response.json()
-        print(f"[DEBUG] JSON результат: {result}")
-        if result.get('ok'):
-            return True, 'OK'
-        else:
-            return False, result.get('error', 'unknown error')
-    except requests.exceptions.Timeout:
-        return False, "Таймаут 10 сек — Apps Script не ответил"
-    except requests.exceptions.ConnectionError as e:
-        return False, f"Ошибка соединения: {e}"
+        print(f"[FORM] HTTP {response.status_code}")
+        return response.status_code in [200, 302, 400]
     except Exception as e:
-        print(f"[DEBUG] Исключение: {type(e).__name__}: {e}")
-        return False, f"{type(e).__name__}: {e}"
+        print(f"[FORM] Ошибка: {e}")
+        return False
 
 def send_completion_message(chat_id, data):
     try:
@@ -136,8 +123,6 @@ def send_completion_message(chat_id, data):
         safe_send_message(chat_id, summary)
         time.sleep(1)
         safe_send_message(chat_id, f"📁 Документы (1-3 мин):\n{GOOGLE_DRIVE_FOLDER_URL}")
-        time.sleep(1)
-        ask_input_method(chat_id)
 
         def send_reminder():
             time.sleep(120)
@@ -149,28 +134,6 @@ def send_completion_message(chat_id, data):
         safe_send_message(chat_id, "❌ Ошибка")
 
 # ── Callback handlers ──────────────────────────────────────────────────────────
-
-@bot.callback_query_handler(func=lambda call: call.data in ['input_manual', 'input_pdf'])
-def handle_input_method(call):
-    try:
-        chat_id = call.message.chat.id
-        if call.data == 'input_manual':
-            now = datetime.now()
-            user_state[chat_id] = {
-                'data': {
-                    'Date_Year': str(now.year),
-                    'Date_Month': str(now.month),
-                    'Date_Day': str(now.day)
-                },
-                'waiting_for': 'Lot'
-            }
-            safe_answer_callback(call.id, "Ручной ввод")
-            safe_send_message(chat_id, "🚗 Введите LOT:")
-        else:
-            safe_answer_callback(call.id, "Загрузка PDF")
-            safe_send_message(chat_id, "📤 Отправьте PDF или фото инвойса")
-    except Exception as e:
-        safe_answer_callback(call.id, "Ошибка")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('buyer_'))
 def handle_buyer_selection(call):
@@ -223,9 +186,9 @@ def handle_file(message):
     now = datetime.now()
     user_state[chat_id] = {
         'data': {
-            'Date_Year': str(now.year),
+            'Date_Year':  str(now.year),
             'Date_Month': str(now.month),
-            'Date_Day': str(now.day)
+            'Date_Day':   str(now.day)
         },
         'waiting_for': 'Lot'
     }
@@ -240,14 +203,14 @@ def handle_text(message):
     text = message.text.strip()
 
     if text.startswith('/start'):
-        ask_input_method(chat_id)
+        safe_send_message(chat_id, "🤖 Auto Invoice Bot\n\n📤 Отправьте PDF или фото инвойса")
         return
     if text.startswith('/folder'):
         safe_send_message(chat_id, f"📁 Документы:\n{GOOGLE_DRIVE_FOLDER_URL}")
         return
 
     if chat_id not in user_state:
-        ask_input_method(chat_id)
+        safe_send_message(chat_id, "📤 Отправьте PDF или фото инвойса")
         return
 
     waiting = user_state[chat_id].get('waiting_for')
@@ -295,12 +258,11 @@ def handle_text(message):
 
             safe_send_message(chat_id, f"✅ Auction Fee: {fee}\n💵 Total USD: {total}\n\n📤 Отправляю...")
 
-            success, detail = submit_to_google_form(user_state[chat_id]['data'])
+            success = submit_to_google_form(user_state[chat_id]['data'])
             if success:
                 send_completion_message(chat_id, user_state[chat_id]['data'])
             else:
-                safe_send_message(chat_id, f"❌ Ошибка отправки в Google Form:\n{detail}")
-                ask_input_method(chat_id)
+                safe_send_message(chat_id, "❌ Ошибка отправки в Google Form")
 
             user_state.pop(chat_id, None)
 
