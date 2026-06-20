@@ -20,24 +20,8 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/formResponse"
-GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/viewform"
-SHEETS_CSV_URL        = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
-
-GOOGLE_FORM_FIELDS = {
-    'Date_Year':    'entry.2136135204_year',
-    'Date_Month':   'entry.2136135204_month',
-    'Date_Day':     'entry.2136135204_day',
-    'Customer_Name':'entry.21018057',
-    'Customer_ID':  'entry.1116307930',
-    'Lot':          'entry.1163357354',
-    'Vehicle':      'entry.341377459',
-    'Vin':          'entry.1094744061',
-    'Amount_USD':   'entry.1342000086',
-    'Auction_Fee':  'entry.532543637',
-    'Total_USD':    'entry.857168306',
-    'Buyer':        'entry.784567376'
-}
+WEBAPP_URL     = "https://script.google.com/macros/s/AKfycbzVXTO8wgKlrq3G9dOGdUl6ehWWRnymv1sbkEzoVdt-lIeGAD1tYQnSU9eplZKOPM9MLw/exec"
+SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
 
 BULK_PROMPT = (
     "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
@@ -400,34 +384,16 @@ def handle_doctype_send_all(call):
 
 def submit_to_google_form(data):
     try:
-        form_data = {
-            entry_id: str(data[field])
-            for field, entry_id in GOOGLE_FORM_FIELDS.items()
-            if field in data and data[field]
-        }
-
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': GOOGLE_FORM_VIEW_URL,
-            'Origin': 'https://docs.google.com',
-        })
-
-        session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
-
-        response = session.post(
-            GOOGLE_FORM_SUBMIT_URL,
-            data=form_data,
-            allow_redirects=True,
-            timeout=30
+        response = requests.post(
+            WEBAPP_URL,
+            json=data,
+            timeout=60
         )
-        print(f"[FORM] Status: {response.status_code}, URL: {response.url}")
-        if response.status_code not in [200, 302]:
-            print(f"[FORM] Body: {response.text[:300]}")
-            return False
-        return True
+        print(f"[WEBAPP] Status: {response.status_code}, Body: {response.text[:200]}")
+        result = response.json()
+        return result.get('ok', False)
     except Exception as e:
-        print(f"[FORM] Exception: {e}")
+        print(f"[WEBAPP] Exception: {e}")
         return False
 
 def send_completion_message(chat_id, data):
