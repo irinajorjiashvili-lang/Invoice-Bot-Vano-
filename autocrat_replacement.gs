@@ -34,9 +34,19 @@ function generateDocuments(e) {
     return;
   }
 
-  // Номер строки: из события или последняя строка (для ручного теста)
-  const row = (e && e.range) ? e.range.getRow() : sheet.getLastRow();
-  if (row <= 1) return; // не обрабатывать заголовок
+  // Пропускаем события не связанные с добавлением строк
+  if (e && e.changeType && e.changeType !== 'INSERT_ROW') return;
+
+  // Всегда обрабатываем последнюю строку (бот добавляет строку через API)
+  const row = sheet.getLastRow();
+  if (row <= 1) return;
+
+  // Проверяем — не обработана ли строка уже (есть ли ссылки на документы)
+  const checkVal = sheet.getRange(row, 14).getValue();
+  if (checkVal && String(checkVal).startsWith('http')) {
+    Logger.log('Строка ' + row + ' уже обработана, пропускаем.');
+    return;
+  }
 
   // Читаем заголовки (строка 1)
   const lastCol = sheet.getLastColumn();
@@ -73,6 +83,7 @@ function generateDocuments(e) {
 
       // Копируем шаблон в папку
       const copy = templateFile.makeCopy('_tmp_', folder);
+      copy.setTrashed(false); // на случай если шаблон в корзине
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
 
@@ -112,10 +123,10 @@ function setupTrigger() {
   // Удаляем старые триггеры
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
 
-  // Создаём триггер на отправку формы
+  // Создаём триггер на изменение таблицы (добавление строки через API)
   ScriptApp.newTrigger('generateDocuments')
     .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
-    .onFormSubmit()
+    .onChange()
     .create();
 
   Logger.log('Триггер установлен успешно.');
