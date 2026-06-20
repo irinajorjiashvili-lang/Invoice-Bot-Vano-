@@ -95,7 +95,7 @@ def submit_to_google_form(data):
         print(f"[DEBUG] Отправляю данные: {form_data}")
         response = requests.post(
             WEBAPP_URL,
-            json=form_data,
+            data=form_data,
             timeout=10
         )
         print(f"[DEBUG] HTTP статус: {response.status_code}")
