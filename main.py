@@ -410,8 +410,8 @@ def get_gsheets_client():
         except Exception as e:
             print(f"[SHEETS] GOOGLE_CREDENTIALS_B64 parse error: {e}")
 
-    env_keys = [k for k in os.environ.keys() if 'GOOGLE' in k or 'CRED' in k]
-    print(f"[SHEETS] Available env vars with GOOGLE/CRED: {env_keys}")
+    env_keys = list(os.environ.keys())
+    print(f"[SHEETS] ALL env var names: {env_keys}")
     raise RuntimeError("No Google credentials found")
 
 def submit_to_google_form(data):
