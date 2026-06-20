@@ -18,7 +18,9 @@ GOOGLE_FORM_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmc
 DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 FORM_FIELDS = {
-    'Date':          'entry.2136135204',
+    'Date_Year':     'entry.2136135204_year',
+    'Date_Month':    'entry.2136135204_month',
+    'Date_Day':      'entry.2136135204_day',
     'Lot':           'entry.1163357354',
     'Vin':           'entry.1094744061',
     'Vehicle':       'entry.341377459',
@@ -96,7 +98,9 @@ def parse_bulk(text):
         amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
         fee    = float(lines[7].replace(',', '').replace(' ', ''))
         return {
-            'Date':          now.strftime('%Y-%m-%d'),
+            'Date_Year':     str(now.year),
+            'Date_Month':    str(now.month),
+            'Date_Day':      str(now.day),
             'Lot':           lines[0],
             'Vin':           lines[1],
             'Vehicle':       lines[2],
@@ -113,7 +117,7 @@ def parse_bulk(text):
 def summary_text(d):
     return (
         "📋 <b>Проверьте данные:</b>\n\n"
-        f"📅 {d['Date']}\n"
+        f"📅 {d['Date_Day']}.{d['Date_Month']}.{d['Date_Year']}\n"
         f"🚗 Лот: <b>{d['Lot']}</b>\n"
         f"🔢 VIN: {d['Vin']}\n"
         f"🚙 Авто: {d['Vehicle']}\n"
