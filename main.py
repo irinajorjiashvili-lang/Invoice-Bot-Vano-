@@ -14,7 +14,7 @@ BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 GOOGLE_FORM_FIELDS = {
