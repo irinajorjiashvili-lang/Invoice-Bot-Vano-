@@ -92,20 +92,33 @@ def submit_to_google_form(data):
             'total_usd':    data.get('Total_USD', ''),
         }
 
+        print(f"[DEBUG] Отправляю данные: {form_data}")
         response = requests.post(
             WEBAPP_URL,
-            data=form_data,
-            timeout=30
+            json=form_data,
+            timeout=10
         )
-        print(f"Sheets response: {response.status_code} {response.text}")
+        print(f"[DEBUG] HTTP статус: {response.status_code}")
+        print(f"[DEBUG] Content-Type: {response.headers.get('Content-Type', 'нет')}")
+        print(f"[DEBUG] Ответ: {response.text[:1000]}")
+
+        content_type = response.headers.get('Content-Type', '')
+        if 'application/json' not in content_type:
+            return False, f"HTTP {response.status_code}: ответ не JSON.\n{response.text[:300]}"
+
         result = response.json()
+        print(f"[DEBUG] JSON результат: {result}")
         if result.get('ok'):
             return True, 'OK'
         else:
             return False, result.get('error', 'unknown error')
+    except requests.exceptions.Timeout:
+        return False, "Таймаут 10 сек — Apps Script не ответил"
+    except requests.exceptions.ConnectionError as e:
+        return False, f"Ошибка соединения: {e}"
     except Exception as e:
-        print(f"Submit error: {e}")
-        return False, str(e)
+        print(f"[DEBUG] Исключение: {type(e).__name__}: {e}")
+        return False, f"{type(e).__name__}: {e}"
 
 def send_completion_message(chat_id, data):
     try:
