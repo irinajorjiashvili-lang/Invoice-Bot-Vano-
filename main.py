@@ -18,9 +18,7 @@ GOOGLE_FORM_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmc
 DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 FORM_FIELDS = {
-    'Date_Year':     'entry.2136135204_year',
-    'Date_Month':    'entry.2136135204_month',
-    'Date_Day':      'entry.2136135204_day',
+    'Date':          'entry.2136135204',
     'Lot':           'entry.1163357354',
     'Vin':           'entry.1094744061',
     'Vehicle':       'entry.341377459',
@@ -78,11 +76,18 @@ def submit_form(data):
         print(f"[FORM] fbzx={fbzx}")
 
         form_data = {v: str(data[k]) for k, v in FORM_FIELDS.items() if k in data and data[k]}
-        form_data['fvv']         = '1'
-        form_data['fbzx']        = fbzx
-        form_data['pageHistory'] = '0'
+        form_data['fvv']           = '1'
+        form_data['fbzx']          = fbzx
+        form_data['pageHistory']   = '0'
+        form_data['draftResponse'] = '[]'
 
-        r = session.post(GOOGLE_FORM_URL, data=form_data, allow_redirects=True, timeout=30)
+        print(f"[FORM] Sending: {form_data}")
+
+        r = session.post(
+            GOOGLE_FORM_URL, data=form_data,
+            headers={'Referer': GOOGLE_FORM_VIEW},
+            allow_redirects=True, timeout=30,
+        )
         print(f"[FORM] {r.status_code}")
         return r.status_code in [200, 302]
     except Exception as e:
@@ -98,9 +103,7 @@ def parse_bulk(text):
         amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
         fee    = float(lines[7].replace(',', '').replace(' ', ''))
         return {
-            'Date_Year':     str(now.year),
-            'Date_Month':    str(now.month),
-            'Date_Day':      str(now.day),
+            'Date':          now.strftime('%Y-%m-%d'),
             'Lot':           lines[0],
             'Vin':           lines[1],
             'Vehicle':       lines[2],
@@ -117,7 +120,7 @@ def parse_bulk(text):
 def summary_text(d):
     return (
         "📋 <b>Проверьте данные:</b>\n\n"
-        f"📅 {d['Date_Day']}.{d['Date_Month']}.{d['Date_Year']}\n"
+        f"📅 {d['Date']}\n"
         f"🚗 Лот: <b>{d['Lot']}</b>\n"
         f"🔢 VIN: {d['Vin']}\n"
         f"🚙 Авто: {d['Vehicle']}\n"
