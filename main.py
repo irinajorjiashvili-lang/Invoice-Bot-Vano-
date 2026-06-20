@@ -109,6 +109,7 @@ def send_completion(chat_id, data):
         f"📁 Документы (1-3 мин):\n{GOOGLE_DRIVE_FOLDER_URL}"
     )
     safe_send(chat_id, msg)
+    safe_send(chat_id, "📤 Отправьте PDF/фото или введите /new")
 
     def reminder():
         time.sleep(120)
