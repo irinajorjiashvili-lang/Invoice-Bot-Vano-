@@ -399,31 +399,42 @@ def handle_doctype_send_all(call):
 
 def submit_to_google_form(data):
     try:
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': GOOGLE_FORM_VIEW_URL,
+        })
+
+        get_resp = session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
+
+        fbzx_match = re.search(r'name="fbzx"\s+value="([^"]+)"', get_resp.text)
+        if not fbzx_match:
+            fbzx_match = re.search(r'"fbzx","([^"]+)"', get_resp.text)
+        if not fbzx_match:
+            fbzx_match = re.search(r'\["fbzx"\],(-?\d+)', get_resp.text)
+        fbzx = fbzx_match.group(1) if fbzx_match else str(-int(time.time() * 1000))
+        print(f"[FORM] fbzx: {fbzx}")
+
         form_data = {
             entry_id: str(data[field])
             for field, entry_id in GOOGLE_FORM_FIELDS.items()
             if field in data and data[field]
         }
         form_data['fvv'] = '1'
-        form_data['fbzx'] = str(int(time.time() * 1000))
+        form_data['fbzx'] = fbzx
         form_data['pageHistory'] = '0'
-
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': GOOGLE_FORM_VIEW_URL,
-        })
-        session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
 
         response = session.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
             allow_redirects=True,
             timeout=30
         )
-        print(f"[FORM] Status: {response.status_code}")
-        return response.status_code in [200, 302]
+        print(f"[FORM] Status: {response.status_code}, URL: {response.url}")
+        if response.status_code in [200, 302]:
+            return True
+        print(f"[FORM] Response body: {response.text[:500]}")
+        return False
     except Exception as e:
         print(f"[FORM] Exception: {e}")
         return False
