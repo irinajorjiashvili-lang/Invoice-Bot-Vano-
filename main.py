@@ -20,8 +20,9 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-WEBAPP_URL     = "https://script.google.com/macros/s/AKfycbzVXTO8wgKlrq3G9dOGdUl6ehWWRnymv1sbkEzoVdt-lIeGAD1tYQnSU9eplZKOPM9MLw/exec"
-SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
+WEBAPP_URL        = "https://script.google.com/macros/s/AKfycbzVXTO8wgKlrq3G9dOGdUl6ehWWRnymv1sbkEzoVdt-lIeGAD1tYQnSU9eplZKOPM9MLw/exec"
+SHEETS_CSV_URL    = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
+DRIVE_FOLDER_URL  = "https://drive.google.com/drive/folders/16TbdEUM8qYdxzYC7heUwe6vIXJQV2wEK"
 
 BULK_PROMPT = (
     "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
@@ -420,30 +421,17 @@ def send_completion_message(chat_id, data):
             f"💸 Fee: ${d.get('Auction_Fee', '—')}\n"
             f"💵 Total: ${d.get('Total_USD', '—')}\n"
             "──────────────────\n"
-            "⏳ Документы будут готовы через ~2 минуты"
+            f"⏳ Документы будут готовы через ~2 минуты:\n{DRIVE_FOLDER_URL}"
         )
         safe_send_message(chat_id, msg, parse_mode='HTML')
 
-        lot     = d.get('Lot', '')
-        vehicle = d.get('Vehicle', '')
-
         def send_reminder():
             time.sleep(120)
-            rows = fetch_invoices()
-            row = next(
-                (r for r in reversed(rows)
-                 if lot.strip() and lot.strip() in [str(c).strip() for c in r.get('_raw', [])]),
-                None
+            safe_send_message(
+                chat_id,
+                f"📁 Документы готовы:\n{DRIVE_FOLDER_URL}",
+                reply_markup=invoice_keyboard()
             )
-            if not row:
-                row = last_data_row(rows)
-            if row:
-                doc_types = get_doc_types_from_row(row)
-                label = f"{lot} | {vehicle}"
-                show_doc_type_selector(chat_id, label, doc_types, lot_key=lot)
-            else:
-                safe_send_message(chat_id, f"Документы для лота <b>{lot}</b> — используйте /docs",
-                                  parse_mode='HTML')
 
         threading.Thread(target=send_reminder, daemon=True).start()
 
