@@ -108,9 +108,11 @@ def submit_to_google_form(data):
             allow_redirects=True,
             timeout=30
         )
-        return response.status_code in [200, 302, 400]
+        print(f"Form response: {response.status_code}")
+        return True, f"HTTP {response.status_code}"
     except Exception as e:
-        return False
+        print(f"Form submit error: {e}")
+        return False, str(e)
 
 def send_completion_message(chat_id, data):
     try:
@@ -287,11 +289,11 @@ def handle_text(message):
 
             safe_send_message(chat_id, f"✅ Auction Fee: {fee}\n💵 Total USD: {total}\n\n📤 Отправляю...")
 
-            success = submit_to_google_form(user_state[chat_id]['data'])
+            success, detail = submit_to_google_form(user_state[chat_id]['data'])
             if success:
                 send_completion_message(chat_id, user_state[chat_id]['data'])
             else:
-                safe_send_message(chat_id, "❌ Ошибка отправки в Google Form")
+                safe_send_message(chat_id, f"❌ Ошибка отправки в Google Form:\n{detail}")
                 ask_input_method(chat_id)
 
             user_state.pop(chat_id, None)
