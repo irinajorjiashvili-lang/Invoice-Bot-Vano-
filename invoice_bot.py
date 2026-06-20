@@ -14,7 +14,7 @@ BOT_TOKEN = '8760516717:AAH6q12ZZZujNdW6XQh8aigZGVOO4fUSQwo'
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 VALID_BUYERS = ['169705', '657313', '218751', '218761']
@@ -94,6 +94,7 @@ def submit_to_google_form(data):
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 
+        print(f"[FORM] Отправляю: {form_data}")
         response = requests.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
@@ -102,6 +103,7 @@ def submit_to_google_form(data):
             timeout=15
         )
         print(f"[FORM] HTTP {response.status_code}")
+        print(f"[FORM] Ответ: {response.text[:300]}")
         return response.status_code in [200, 302, 400]
     except Exception as e:
         print(f"[FORM] Ошибка: {e}")
