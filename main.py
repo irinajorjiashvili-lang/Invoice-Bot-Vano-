@@ -18,9 +18,6 @@ GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 GOOGLE_FORM_FIELDS = {
-    'Date_Year':     'entry.2136135204_year',
-    'Date_Month':    'entry.2136135204_month',
-    'Date_Day':      'entry.2136135204_day',
     'Customer_Name': 'entry.21018057',
     'Customer_ID':   'entry.1116307930',
     'Lot':           'entry.1163357354',
@@ -60,6 +57,9 @@ def submit_to_google_form(data):
         form_data = {entry_id: str(data[field])
                      for field, entry_id in GOOGLE_FORM_FIELDS.items()
                      if field in data and data[field]}
+        month = str(data.get('Date_Month', '')).zfill(2)
+        day   = str(data.get('Date_Day', '')).zfill(2)
+        form_data['entry.2136135204'] = f"{data.get('Date_Year', '')}-{month}-{day}"
         headers = {
             'User-Agent': 'Mozilla/5.0',
             'Content-Type': 'application/x-www-form-urlencoded'
