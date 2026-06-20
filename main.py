@@ -219,7 +219,12 @@ def download_drive_file(url):
     except Exception:
         return None
 
+NO_PDF_KEYWORDS = ['Доп соглашение', 'დანართი 2', 'transportation service']
+
 def send_pdf_to_user(chat_id, name, url):
+    if any(kw.lower() in name.lower() for kw in NO_PDF_KEYWORDS):
+        safe_send_message(chat_id, f"📄 <b>{name}</b>\n{url}", parse_mode='HTML')
+        return
     safe_send_message(chat_id, f"Загружаю: <b>{name}</b>...", parse_mode='HTML')
     content = download_drive_file(url)
     if content:
