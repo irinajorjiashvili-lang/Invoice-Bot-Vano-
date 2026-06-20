@@ -9,8 +9,6 @@ from telebot import types
 import requests
 import time
 import threading
-import gspread
-from google.oauth2.service_account import Credentials
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
@@ -22,10 +20,24 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
 
-SHEETS_CSV_URL    = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
-SPREADSHEET_ID    = "1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw"
-SHEET_GID         = 1152025982
-GSHEETS_SCOPES    = ["https://www.googleapis.com/auth/spreadsheets"]
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/formResponse"
+GOOGLE_FORM_VIEW_URL  = "https://docs.google.com/forms/d/e/1FAIpQLScNSb3c7aTOaaWPU-glnLQlhHdbpIL2EC-me7HevJ2yZnlbdw/viewform"
+SHEETS_CSV_URL        = "https://docs.google.com/spreadsheets/d/1TZLP0-nmPEICQsXXQuipnov9tR4JVWeC4aRu8I-KzWw/export?format=csv&gid=1152025982"
+
+GOOGLE_FORM_FIELDS = {
+    'Date_Year':    'entry.2136135204_year',
+    'Date_Month':   'entry.2136135204_month',
+    'Date_Day':     'entry.2136135204_day',
+    'Customer_Name':'entry.21018057',
+    'Customer_ID':  'entry.1116307930',
+    'Lot':          'entry.1163357354',
+    'Vehicle':      'entry.341377459',
+    'Vin':          'entry.1094744061',
+    'Amount_USD':   'entry.1342000086',
+    'Auction_Fee':  'entry.532543637',
+    'Total_USD':    'entry.857168306',
+    'Buyer':        'entry.784567376'
+}
 
 BULK_PROMPT = (
     "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
@@ -386,63 +398,47 @@ def handle_doctype_send_all(call):
 
 # ── Google Form ────────────────────────────────────────────────────────────────
 
-def get_gsheets_client():
-    import base64
-    creds_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'credentials.json')
-    if os.path.exists(creds_file):
-        creds = Credentials.from_service_account_file(creds_file, scopes=GSHEETS_SCOPES)
-        return gspread.authorize(creds)
-
-    creds_json = os.environ.get('GOOGLE_CREDENTIALS')
-    if creds_json:
-        try:
-            creds = Credentials.from_service_account_info(json.loads(creds_json), scopes=GSHEETS_SCOPES)
-            return gspread.authorize(creds)
-        except Exception as e:
-            print(f"[SHEETS] GOOGLE_CREDENTIALS parse error: {e}")
-
-    creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
-    if creds_b64:
-        try:
-            creds_json = base64.b64decode(creds_b64).decode('utf-8')
-            creds = Credentials.from_service_account_info(json.loads(creds_json), scopes=GSHEETS_SCOPES)
-            return gspread.authorize(creds)
-        except Exception as e:
-            print(f"[SHEETS] GOOGLE_CREDENTIALS_B64 parse error: {e}")
-
-    env_keys = list(os.environ.keys())
-    print(f"[SHEETS] ALL env var names: {env_keys}")
-    raise RuntimeError("No Google credentials found")
-
 def submit_to_google_form(data):
     try:
-        gc = get_gsheets_client()
-        sh = gc.open_by_key(SPREADSHEET_ID)
-        worksheet = sh.get_worksheet_by_id(SHEET_GID)
+        form_data = {
+            entry_id: str(data[field])
+            for field, entry_id in GOOGLE_FORM_FIELDS.items()
+            if field in data and data[field]
+        }
 
-        now = datetime.now()
-        timestamp = now.strftime('%d/%m/%Y %H:%M:%S')
-        date_str  = f"{data.get('Date_Day', now.day)}/{data.get('Date_Month', now.month)}/{data.get('Date_Year', now.year)}"
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': GOOGLE_FORM_VIEW_URL,
+            'Origin': 'https://docs.google.com',
+        })
 
-        row = [
-            timestamp,
-            date_str,
-            data.get('Customer_Name', ''),
-            data.get('Customer_ID', ''),
-            data.get('Buyer', ''),
-            data.get('Lot', ''),
-            data.get('Vehicle', ''),
-            data.get('Vin', ''),
-            data.get('Amount_USD', ''),
-            data.get('Auction_Fee', ''),
-            data.get('Total_USD', ''),
-        ]
+        get_resp = session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
 
-        worksheet.append_row(row, value_input_option='USER_ENTERED')
-        print(f"[SHEETS] Row appended: {row[:6]}")
+        fbzx = '-' + str(int(time.time() * 1000) % (10**15))
+        for pattern in [r'name="fbzx"\s+value="([^"]+)"', r'"fbzx"\s*[,:]\s*"([^"]+)"', r'\["fbzx"\],\s*(-?\d+)']:
+            m = re.search(pattern, get_resp.text)
+            if m:
+                fbzx = m.group(1)
+                break
+
+        form_data['fvv'] = '1'
+        form_data['fbzx'] = fbzx
+        form_data['pageHistory'] = '0'
+
+        response = session.post(
+            GOOGLE_FORM_SUBMIT_URL,
+            data=form_data,
+            allow_redirects=True,
+            timeout=30
+        )
+        print(f"[FORM] Status: {response.status_code}, URL: {response.url}")
+        if response.status_code not in [200, 302]:
+            print(f"[FORM] Body: {response.text[:300]}")
+            return False
         return True
     except Exception as e:
-        print(f"[SHEETS] Exception: {e}")
+        print(f"[FORM] Exception: {e}")
         return False
 
 def send_completion_message(chat_id, data):
