@@ -1,5 +1,4 @@
 import os
-import re
 import telebot
 from datetime import datetime
 from telebot import types
@@ -15,24 +14,8 @@ BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-GOOGLE_FORM_VIEW_URL   = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
+WEBAPP_URL          = "https://script.google.com/macros/s/AKfycbxuhybkuI8TlmMJ8szWudDDFHCf48Yg-HBcE2k4O-BuY4R7CDryKqpGUHjcpLnMBu6cZA/exec"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
-
-GOOGLE_FORM_FIELDS = {
-    'Date_Year':     'entry.2136135204_year',
-    'Date_Month':    'entry.2136135204_month',
-    'Date_Day':      'entry.2136135204_day',
-    'Customer_Name': 'entry.21018057',
-    'Customer_ID':   'entry.1116307930',
-    'Lot':           'entry.1163357354',
-    'Vehicle':       'entry.341377459',
-    'Vin':           'entry.1094744061',
-    'Amount_USD':    'entry.1342000086',
-    'Auction_Fee':   'entry.532543637',
-    'Total_USD':     'entry.857168306',
-    'Buyer':         'entry.784567376',
-}
 
 INPUT_TEMPLATE = (
     "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
@@ -59,37 +42,11 @@ def safe_send(chat_id, text, reply_markup=None):
 
 def submit_to_google_form(data):
     try:
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
-        })
-
-        # Получаем страницу формы — нужны куки и fbzx токен
-        page = session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
-        fbzx = re.search(r'"fbzx"\s*:\s*"?(-?\d+)"?', page.text)
-        fbzx = fbzx.group(1) if fbzx else str(int(time.time() * 1000))
-        print(f"[FORM] fbzx={fbzx}")
-
-        form_data = {}
-        for field, entry_id in GOOGLE_FORM_FIELDS.items():
-            if field in data and data[field]:
-                form_data[entry_id] = str(data[field])
-
-        form_data['fvv']         = '1'
-        form_data['fbzx']        = fbzx
-        form_data['pageHistory'] = '0'
-
-        response = session.post(
-            GOOGLE_FORM_SUBMIT_URL,
-            data=form_data,
-            headers={'Referer': GOOGLE_FORM_VIEW_URL},
-            allow_redirects=True,
-            timeout=30
-        )
-        print(f"[FORM] status={response.status_code}")
-        return response.status_code in [200, 302]
+        r = requests.post(WEBAPP_URL, json=data, timeout=30)
+        print(f"[WEBAPP] {r.status_code} {r.text[:100]}")
+        return r.json().get('ok', False)
     except Exception as e:
-        print(f"[FORM] error: {e}")
+        print(f"[WEBAPP] error: {e}")
         return False
 
 
