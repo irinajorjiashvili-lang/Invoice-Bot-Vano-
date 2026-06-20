@@ -12,13 +12,11 @@ print("Starting Invoice Bot...")
 BOT_TOKEN    = os.environ.get('BOT_TOKEN', '8760516717:AAEmEESz8YxnqEnBIOrHKk5-n8Hns5L8wVA')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 
-GOOGLE_FORM_URL  = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_FORM_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 FORM_FIELDS = {
-    'Date_Year':     'entry.2136135204_year',
-    'Date_Month':    'entry.2136135204_month',
-    'Date_Day':      'entry.2136135204_day',
+    'Date':          'entry.2136135204',
     'Lot':           'entry.1163357354',
     'Vin':           'entry.1094744061',
     'Vehicle':       'entry.341377459',
@@ -66,6 +64,7 @@ def safe_cb(call_id, text=''):
 def submit_form(data):
     try:
         form_data = {v: str(data[k]) for k, v in FORM_FIELDS.items() if k in data and data[k]}
+        print(f"[FORM] Sending: {form_data}")
         r = requests.post(
             GOOGLE_FORM_URL, data=form_data,
             headers={'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded'},
@@ -86,9 +85,7 @@ def parse_bulk(text):
         amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
         fee    = float(lines[7].replace(',', '').replace(' ', ''))
         return {
-            'Date_Year':     str(now.year),
-            'Date_Month':    str(now.month),
-            'Date_Day':      str(now.day),
+            'Date':          now.strftime('%Y-%m-%d'),
             'Lot':           lines[0],
             'Vin':           lines[1],
             'Vehicle':       lines[2],
@@ -105,7 +102,7 @@ def parse_bulk(text):
 def summary_text(d):
     return (
         "📋 <b>Проверьте данные:</b>\n\n"
-        f"📅 {d['Date_Day']}.{d['Date_Month']}.{d['Date_Year']}\n"
+        f"📅 {d['Date']}\n"
         f"🚗 Лот: <b>{d['Lot']}</b>\n"
         f"🔢 VIN: {d['Vin']}\n"
         f"🚙 Авто: {d['Vehicle']}\n"
