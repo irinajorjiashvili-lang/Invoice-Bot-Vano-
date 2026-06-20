@@ -1,36 +1,38 @@
 import os
-import time
-import threading
-import requests
 import telebot
 from datetime import datetime
 from telebot import types
+import requests
+import time
+import threading
 
 os.environ['PYTHONUNBUFFERED'] = '1'
-print("Starting Invoice Bot...")
+print("🚀 Auto Invoice Bot starting...")
 
-BOT_TOKEN    = os.environ.get('BOT_TOKEN', '8760516717:AAEmEESz8YxnqEnBIOrHKk5-n8Hns5L8wVA')
+BOT_TOKEN  = os.environ.get('BOT_TOKEN', '8760516717:AAEmEESz8YxnqEnBIOrHKk5-n8Hns5L8wVA')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
+bot = telebot.TeleBot(BOT_TOKEN)
+user_state = {}
 
-GOOGLE_FORM_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
-DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
+GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
-FORM_FIELDS = {
+GOOGLE_FORM_FIELDS = {
     'Date_Year':     'entry.2136135204_year',
     'Date_Month':    'entry.2136135204_month',
     'Date_Day':      'entry.2136135204_day',
-    'Lot':           'entry.1163357354',
-    'Vin':           'entry.1094744061',
-    'Vehicle':       'entry.341377459',
-    'Amount_USD':    'entry.1342000086',
-    'Buyer':         'entry.784567376',
     'Customer_Name': 'entry.21018057',
     'Customer_ID':   'entry.1116307930',
+    'Lot':           'entry.1163357354',
+    'Vehicle':       'entry.341377459',
+    'Vin':           'entry.1094744061',
+    'Amount_USD':    'entry.1342000086',
     'Auction_Fee':   'entry.532543637',
     'Total_USD':     'entry.857168306',
+    'Buyer':         'entry.784567376',
 }
 
-BULK_TEMPLATE = (
+INPUT_TEMPLATE = (
     "📋 Отправьте данные одним сообщением, каждый с новой строки:\n\n"
     "LOT\n"
     "VIN\n"
@@ -42,53 +44,79 @@ BULK_TEMPLATE = (
     "Auction Fee"
 )
 
-bot        = telebot.TeleBot(BOT_TOKEN)
-user_state = {}
 
-
-def safe_send(chat_id, text, markup=None, parse_mode=None):
-    for i in range(3):
+def safe_send(chat_id, text, reply_markup=None):
+    for attempt in range(3):
         try:
-            return bot.send_message(chat_id, text, reply_markup=markup, parse_mode=parse_mode)
+            return bot.send_message(chat_id, text, reply_markup=reply_markup)
         except Exception:
-            if i < 2:
+            if attempt < 2:
                 time.sleep(1)
     return None
 
-def safe_cb(call_id, text=''):
-    for i in range(3):
-        try:
-            return bot.answer_callback_query(call_id, text)
-        except Exception:
-            if i < 2:
-                time.sleep(1)
 
-def submit_form(data):
+def submit_to_google_form(data):
     try:
-        form_data = {v: str(data[k]) for k, v in FORM_FIELDS.items() if k in data and data[k]}
-        r = requests.post(
-            GOOGLE_FORM_URL, data=form_data,
-            headers={'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded'},
-            allow_redirects=True, timeout=30,
+        form_data = {}
+        for field, entry_id in GOOGLE_FORM_FIELDS.items():
+            if field in data and data[field]:
+                form_data[entry_id] = str(data[field])
+        response = requests.post(
+            GOOGLE_FORM_SUBMIT_URL,
+            data=form_data,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            allow_redirects=True,
+            timeout=30
         )
-        print(f"[FORM] {r.status_code}")
-        return r.status_code in [200, 302, 400]
+        print(f"[FORM] {response.status_code}")
+        return response.status_code in [200, 302, 400]
     except Exception as e:
-        print(f"[FORM] {e}")
+        print(f"[FORM] error: {e}")
         return False
 
-def parse_bulk(text):
-    lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
-    if len(lines) < 8:
-        return None
+
+def send_completion(chat_id, data):
+    msg = (
+        "✅ Отправлено\n\n"
+        f"📅 {data['Date_Day']}.{data['Date_Month']}.{data['Date_Year']}\n"
+        f"🚗 Lot: {data['Lot']}\n"
+        f"🔢 VIN: {data['Vin']}\n"
+        f"🚙 {data['Vehicle']}\n"
+        f"🏢 Buyer: {data['Buyer']}\n"
+        f"👤 {data['Customer_Name']} ({data['Customer_ID']})\n"
+        f"💰 Amount: ${data['Amount_USD']}\n"
+        f"💸 Fee: ${data['Auction_Fee']}\n"
+        f"💵 Total: ${data['Total_USD']}\n\n"
+        f"📁 Документы (1-3 мин):\n{GOOGLE_DRIVE_FOLDER_URL}"
+    )
+    safe_send(chat_id, msg)
+
+    def reminder():
+        time.sleep(120)
+        safe_send(chat_id, f"⏰ Проверьте документы:\n{GOOGLE_DRIVE_FOLDER_URL}")
+
+    threading.Thread(target=reminder, daemon=True).start()
+
+
+def start_input(chat_id):
+    now = datetime.now()
+    user_state[chat_id] = {
+        'auth': True,
+        'waiting_for': 'bulk',
+        'date': {'Date_Year': str(now.year), 'Date_Month': str(now.month), 'Date_Day': str(now.day)}
+    }
+    safe_send(chat_id, INPUT_TEMPLATE)
+
+
+def parse_bulk(lines, date):
     try:
-        now    = datetime.now()
         amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
         fee    = float(lines[7].replace(',', '').replace(' ', ''))
         return {
-            'Date_Year':     str(now.year),
-            'Date_Month':    str(now.month),
-            'Date_Day':      str(now.day),
+            **date,
             'Lot':           lines[0],
             'Vin':           lines[1],
             'Vehicle':       lines[2],
@@ -102,104 +130,44 @@ def parse_bulk(text):
     except Exception:
         return None
 
-def summary_text(d):
-    return (
-        "📋 <b>Проверьте данные:</b>\n\n"
-        f"📅 {d['Date_Day']}.{d['Date_Month']}.{d['Date_Year']}\n"
-        f"🚗 Лот: <b>{d['Lot']}</b>\n"
-        f"🔢 VIN: {d['Vin']}\n"
-        f"🚙 Авто: {d['Vehicle']}\n"
-        f"🏢 Buyer: {d['Buyer']}\n"
-        f"👤 {d['Customer_Name']} ({d['Customer_ID']})\n"
-        f"💰 Amount: ${d['Amount_USD']}\n"
-        f"💸 Fee: ${d['Auction_Fee']}\n"
-        f"💵 Total: ${d['Total_USD']}"
-    )
 
-def confirm_kb():
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        types.InlineKeyboardButton("✅ Подтвердить", callback_data="confirm"),
-        types.InlineKeyboardButton("❌ Отмена",      callback_data="cancel"),
-    )
-    return kb
-
-def new_invoice_kb():
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📋 Новый инвойс", callback_data="new_inv"))
-    return kb
-
-def do_submit(chat_id, data):
-    if submit_form(data):
-        safe_send(chat_id,
-            f"✅ Отправлено!\n\n📁 Документы (1-3 мин):\n{DRIVE_FOLDER_URL}",
-            markup=new_invoice_kb()
-        )
-        def reminder():
-            time.sleep(120)
-            safe_send(chat_id, f"⏰ Проверьте документы:\n{DRIVE_FOLDER_URL}", markup=new_invoice_kb())
-        threading.Thread(target=reminder, daemon=True).start()
-    else:
-        safe_send(chat_id, "❌ Ошибка отправки. Попробуйте /new", markup=new_invoice_kb())
-    user_state[chat_id] = {'auth': True}
-
-
-# ── Callbacks ──────────────────────────────────────────────────────────────────
-
-@bot.callback_query_handler(func=lambda c: c.data == 'confirm')
-def cb_confirm(call):
-    chat_id = call.message.chat.id
-    data = user_state.get(chat_id, {}).get('data')
-    if not data:
-        return safe_cb(call.id)
-    safe_cb(call.id, "Отправляю...")
-    try:
-        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
-    except Exception:
-        pass
-    do_submit(chat_id, data)
-
-@bot.callback_query_handler(func=lambda c: c.data == 'cancel')
-def cb_cancel(call):
-    chat_id = call.message.chat.id
-    safe_cb(call.id, "Отменено")
-    try:
-        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
-    except Exception:
-        pass
-    user_state[chat_id] = {'auth': True, 'waiting_for': 'bulk_input'}
-    safe_send(chat_id, f"❌ Отменено.\n\n{BULK_TEMPLATE}")
-
-@bot.callback_query_handler(func=lambda c: c.data == 'new_inv')
-def cb_new(call):
-    chat_id = call.message.chat.id
-    safe_cb(call.id)
-    user_state[chat_id] = {'auth': True, 'waiting_for': 'bulk_input'}
-    safe_send(chat_id, BULK_TEMPLATE)
-
-
-# ── Message handlers ───────────────────────────────────────────────────────────
+# ── Handlers ───────────────────────────────────────────────────────────────────
 
 @bot.message_handler(content_types=['document', 'photo'])
-def on_file(message):
+def handle_file(message):
     chat_id = message.chat.id
     if not user_state.get(chat_id, {}).get('auth'):
         user_state[chat_id] = {'auth': False}
-        return safe_send(chat_id, "🔒 Введите пароль:")
-    user_state[chat_id] = {'auth': True, 'waiting_for': 'bulk_input'}
-    safe_send(chat_id, f"✅ Файл получен.\n\n{BULK_TEMPLATE}")
+        safe_send(chat_id, "🔒 Введите пароль:")
+        return
+    start_input(chat_id)
+
 
 @bot.message_handler(content_types=['text'])
-def on_text(message):
+def handle_text(message):
     chat_id = message.chat.id
     text    = message.text.strip()
 
-    if text == '/start':
+    if text.startswith('/start'):
         user_state[chat_id] = {'auth': False}
-        return safe_send(chat_id, "🤖 Invoice Bot\n\n🔒 Введите пароль:")
+        safe_send(chat_id, "🤖 Invoice Bot\n\n🔒 Введите пароль:")
+        return
+
+    if text.startswith('/folder'):
+        safe_send(chat_id, f"📁 Документы:\n{GOOGLE_DRIVE_FOLDER_URL}")
+        return
+
+    if text == '/new':
+        if user_state.get(chat_id, {}).get('auth'):
+            start_input(chat_id)
+        else:
+            user_state[chat_id] = {'auth': False}
+            safe_send(chat_id, "🔒 Введите пароль:")
+        return
 
     state = user_state.get(chat_id, {})
 
+    # Auth
     if not state.get('auth'):
         if text == BOT_PASSWORD:
             user_state[chat_id] = {'auth': True}
@@ -208,39 +176,45 @@ def on_text(message):
             safe_send(chat_id, "❌ Неверный пароль.")
         return
 
-    if text == '/new':
-        user_state[chat_id] = {'auth': True, 'waiting_for': 'bulk_input'}
-        return safe_send(chat_id, BULK_TEMPLATE)
+    if state.get('waiting_for') == 'bulk':
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        if len(lines) < 8:
+            safe_send(chat_id, f"❌ Нужно 8 строк. Попробуйте ещё раз:\n\n{INPUT_TEMPLATE}")
+            return
 
-    waiting = state.get('waiting_for')
-
-    if waiting == 'bulk_input':
-        data = parse_bulk(text)
+        data = parse_bulk(lines, state['date'])
         if not data:
-            return safe_send(chat_id, f"❌ Нужно 8 строк. Попробуйте ещё раз:\n\n{BULK_TEMPLATE}")
-        state['data']        = data
-        state['waiting_for'] = 'confirm'
-        safe_send(chat_id, summary_text(data), markup=confirm_kb(), parse_mode='HTML')
+            safe_send(chat_id, "❌ Ошибка в данных. Проверьте числа (Amount, Fee).")
+            return
+
+        safe_send(chat_id, "📤 Отправляю...")
+        if submit_to_google_form(data):
+            send_completion(chat_id, data)
+        else:
+            safe_send(chat_id, "❌ Ошибка отправки в Google Form")
+
+        user_state[chat_id] = {'auth': True}
     else:
         safe_send(chat_id, "📤 Отправьте PDF/фото или введите /new")
 
 
 # ── Start ──────────────────────────────────────────────────────────────────────
 
-print(f"Started at: {datetime.now()}")
+print("📅 Started at:", datetime.now())
+
 try:
     bot.delete_webhook(drop_pending_updates=True)
-    print("Webhook cleared")
+    print("✅ Webhook cleared")
 except Exception as e:
-    print(f"Webhook error: {e}")
+    print(f"⚠️ Webhook clear error: {e}")
 
-print("Waiting 35s...")
+print("Waiting 35s for old connections to expire...")
 time.sleep(35)
 
 while True:
     try:
-        print("Bot polling started...")
+        print("🔄 Bot polling started...")
         bot.infinity_polling(timeout=30, long_polling_timeout=20)
     except Exception as e:
-        print(f"Bot error: {e}")
+        print(f"❌ Bot error: {e}")
         time.sleep(5)
