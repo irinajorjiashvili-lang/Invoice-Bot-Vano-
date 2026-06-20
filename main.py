@@ -16,10 +16,8 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 
 print("Bot starting...")
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8760516717:AAEmEESz8YxnqEnBIOrHKk5-n8Hns5L8wVA')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable is not set")
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 authorized_users = set()
