@@ -623,7 +623,8 @@ try:
 except Exception as e:
     print(f"Webhook clear error: {e}")
 
-time.sleep(2)
+print("Waiting 35s for old connections to expire...")
+time.sleep(35)
 
 while True:
     try:
