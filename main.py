@@ -14,13 +14,11 @@ BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 GOOGLE_FORM_FIELDS = {
-    'Date_Year':     'entry.2136135204_year',
-    'Date_Month':    'entry.2136135204_month',
-    'Date_Day':      'entry.2136135204_day',
+    'Date':          'entry.2136135204',
     'Customer_Name': 'entry.21018057',
     'Customer_ID':   'entry.1116307930',
     'Lot':           'entry.1163357354',
@@ -81,7 +79,7 @@ def submit_to_google_form(data):
 def send_completion(chat_id, data):
     msg = (
         "✅ Отправлено\n\n"
-        f"📅 {data['Date_Day']}.{data['Date_Month']}.{data['Date_Year']}\n"
+        f"📅 {data['Date']}\n"
         f"🚗 Lot: {data['Lot']}\n"
         f"🔢 VIN: {data['Vin']}\n"
         f"🚙 {data['Vehicle']}\n"
@@ -102,21 +100,19 @@ def send_completion(chat_id, data):
 
 
 def start_input(chat_id):
-    now = datetime.now()
     user_state[chat_id] = {
         'auth': True,
         'waiting_for': 'bulk',
-        'date': {'Date_Year': str(now.year), 'Date_Month': str(now.month), 'Date_Day': str(now.day)}
     }
     safe_send(chat_id, INPUT_TEMPLATE)
 
 
-def parse_bulk(lines, date):
+def parse_bulk(lines):
     try:
         amount = float(lines[3].replace(',', '').replace('$', '').replace(' ', ''))
         fee    = float(lines[7].replace(',', '').replace(' ', ''))
         return {
-            **date,
+            'Date':          datetime.now().strftime('%Y-%m-%d'),
             'Lot':           lines[0],
             'Vin':           lines[1],
             'Vehicle':       lines[2],
@@ -182,7 +178,7 @@ def handle_text(message):
             safe_send(chat_id, f"❌ Нужно 8 строк. Попробуйте ещё раз:\n\n{INPUT_TEMPLATE}")
             return
 
-        data = parse_bulk(lines, state['date'])
+        data = parse_bulk(lines)
         if not data:
             safe_send(chat_id, "❌ Ошибка в данных. Проверьте числа (Amount, Fee).")
             return
