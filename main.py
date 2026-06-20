@@ -1,4 +1,5 @@
 import os
+import re
 import telebot
 from datetime import datetime
 from telebot import types
@@ -14,7 +15,8 @@ BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-GOOGLE_FORM_SUBMIT_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
+GOOGLE_FORM_VIEW_URL   = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
+GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 GOOGLE_FORM_FIELDS = {
@@ -55,22 +57,35 @@ def safe_send(chat_id, text, reply_markup=None):
 
 def submit_to_google_form(data):
     try:
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+        })
+
+        # Получаем страницу формы — нужны куки и fbzx токен
+        page = session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
+        fbzx = re.search(r'"fbzx"\s*:\s*"?(-?\d+)"?', page.text)
+        fbzx = fbzx.group(1) if fbzx else str(int(time.time() * 1000))
+        print(f"[FORM] fbzx={fbzx}")
+
         form_data = {}
         for field, entry_id in GOOGLE_FORM_FIELDS.items():
             if field in data and data[field]:
                 form_data[entry_id] = str(data[field])
-        response = requests.post(
+
+        form_data['fvv']         = '1'
+        form_data['fbzx']        = fbzx
+        form_data['pageHistory'] = '0'
+
+        response = session.post(
             GOOGLE_FORM_SUBMIT_URL,
             data=form_data,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
+            headers={'Referer': GOOGLE_FORM_VIEW_URL},
             allow_redirects=True,
             timeout=30
         )
-        print(f"[FORM] {response.status_code}")
-        return response.status_code in [200, 302, 400]
+        print(f"[FORM] status={response.status_code}")
+        return response.status_code in [200, 302]
     except Exception as e:
         print(f"[FORM] error: {e}")
         return False
