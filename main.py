@@ -25,8 +25,7 @@ GOOGLE_FORM_FIELDS = {
     'Vin':           'entry.1094744061',
     'Amount_USD':    'entry.1342000086',
     'Auction_Fee':   'entry.532543637',
-    'Total_USD':     'entry.857168306',
-    'Buyer':         'entry.784567376'
+    'Total_USD':     'entry.857168306'
 }
 
 INPUT_TEMPLATE = (
@@ -61,6 +60,13 @@ def submit_to_google_form(data):
         month = str(data.get('Date_Month', '')).zfill(2)
         day   = str(data.get('Date_Day', '')).zfill(2)
         form_data['entry.2136135204'] = f"{data.get('Date_Year', '')}-{month}-{day}"
+
+        buyer = str(data.get('Buyer', ''))
+        if buyer in VALID_BUYERS:
+            form_data['entry.784567376'] = buyer
+        else:
+            form_data['entry.784567376'] = '__other_option__'
+            form_data['entry.784567376.other_option_response'] = buyer
         form_data['fvv'] = '1'
         form_data['pageHistory'] = '0'
         form_data['fbzx'] = str(random.randint(-9007199254740991, 9007199254740991))
