@@ -64,6 +64,11 @@ def submit_to_google_form(data):
             'User-Agent': 'Mozilla/5.0',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
+        import random
+        form_data['fvv'] = '1'
+        form_data['pageHistory'] = '0'
+        form_data['fbzx'] = str(random.randint(-9007199254740991, 9007199254740991))
+
         print(f"[FORM] Отправляю: {form_data}")
         r = requests.post(GOOGLE_FORM_SUBMIT_URL, data=form_data, headers=headers,
                           allow_redirects=True, timeout=15)
