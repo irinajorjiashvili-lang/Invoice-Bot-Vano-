@@ -413,18 +413,7 @@ def submit_to_google_form(data):
             'Origin': 'https://docs.google.com',
         })
 
-        get_resp = session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
-
-        fbzx = '-' + str(int(time.time() * 1000) % (10**15))
-        for pattern in [r'name="fbzx"\s+value="([^"]+)"', r'"fbzx"\s*[,:]\s*"([^"]+)"', r'\["fbzx"\],\s*(-?\d+)']:
-            m = re.search(pattern, get_resp.text)
-            if m:
-                fbzx = m.group(1)
-                break
-
-        form_data['fvv'] = '1'
-        form_data['fbzx'] = fbzx
-        form_data['pageHistory'] = '0'
+        session.get(GOOGLE_FORM_VIEW_URL, timeout=15)
 
         response = session.post(
             GOOGLE_FORM_SUBMIT_URL,
