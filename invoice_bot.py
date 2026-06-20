@@ -14,7 +14,7 @@ BOT_TOKEN = '8760516717:AAH6q12ZZZujNdW6XQh8aigZGVOO4fUSQwo'
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx9j2J0RmxBZkR6kUHaLVw2L8DYsSj4Kyi-1zZp2P_sX3lZ0gfV_QCUxKEwcyTUGsYbDg/exec"
+WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzrOdGbY38wasdvBFfcfez-FwwjSPJj1_Rcl1cHB3D4pXsPzqhOCy8qQxwrIfeKSIeY8Q/exec"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 VALID_BUYERS = ['169705', '657313', '218751', '218761']
