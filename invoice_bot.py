@@ -14,7 +14,7 @@ BOT_TOKEN = '8760516717:AAH6q12ZZZujNdW6XQh8aigZGVOO4fUSQwo'
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
 
-GOOGLE_FORM_SUBMIT_URL = "https://docs.google.com/forms/u/0/d/1wOP-nAS7h8y8r4L6ezeaNow2v9XVGkQ3mOamzX-dLKA/formResponse"
+WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx9j2J0RmxBZkR6kUHaLVw2L8DYsSj4Kyi-1zZp2P_sX3lZ0gfV_QCUxKEwcyTUGsYbDg/exec"
 GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
 VALID_BUYERS = ['169705', '657313', '218751', '218761']
@@ -24,20 +24,6 @@ REGULAR_CUSTOMER = {
     'id': '28001088898'
 }
 
-GOOGLE_FORM_FIELDS = {
-    'Date_Year': 'entry.2136135204_year',
-    'Date_Month': 'entry.2136135204_month',
-    'Date_Day': 'entry.2136135204_day',
-    'Customer_Name': 'entry.21018057',
-    'Customer_ID': 'entry.1116307930',
-    'Lot': 'entry.1163357354',
-    'Vehicle': 'entry.341377459',
-    'Vin': 'entry.1094744061',
-    'Amount_USD': 'entry.1342000086',
-    'Auction_Fee': 'entry.532543637',
-    'Total_USD': 'entry.857168306',
-    'Buyer': 'entry.784567376'
-}
 
 def safe_send_message(chat_id, text, reply_markup=None, max_retries=3):
     for attempt in range(max_retries):
@@ -91,27 +77,34 @@ def ask_customer_type(chat_id):
 
 def submit_to_google_form(data):
     try:
-        form_data = {}
-        for field, entry_id in GOOGLE_FORM_FIELDS.items():
-            if field in data and data[field]:
-                form_data[entry_id] = str(data[field])
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Content-Type': 'application/x-www-form-urlencoded'
+        form_data = {
+            'year':         data.get('Date_Year', ''),
+            'month':        data.get('Date_Month', ''),
+            'day':          data.get('Date_Day', ''),
+            'customer_name': data.get('Customer_Name', ''),
+            'customer_id':  data.get('Customer_ID', ''),
+            'buyer':        data.get('Buyer', ''),
+            'lot':          data.get('Lot', ''),
+            'vehicle':      data.get('Vehicle', ''),
+            'vin':          data.get('Vin', ''),
+            'amount_usd':   data.get('Amount_USD', ''),
+            'auction_fee':  data.get('Auction_Fee', ''),
+            'total_usd':    data.get('Total_USD', ''),
         }
 
         response = requests.post(
-            GOOGLE_FORM_SUBMIT_URL,
+            WEBAPP_URL,
             data=form_data,
-            headers=headers,
-            allow_redirects=True,
             timeout=30
         )
-        print(f"Form response: {response.status_code}")
-        return True, f"HTTP {response.status_code}"
+        print(f"Sheets response: {response.status_code} {response.text}")
+        result = response.json()
+        if result.get('ok'):
+            return True, 'OK'
+        else:
+            return False, result.get('error', 'unknown error')
     except Exception as e:
-        print(f"Form submit error: {e}")
+        print(f"Submit error: {e}")
         return False, str(e)
 
 def send_completion_message(chat_id, data):
