@@ -387,15 +387,30 @@ def handle_doctype_send_all(call):
 # ── Google Form ────────────────────────────────────────────────────────────────
 
 def get_gsheets_client():
+    import base64
     creds_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'credentials.json')
     if os.path.exists(creds_file):
         creds = Credentials.from_service_account_file(creds_file, scopes=GSHEETS_SCOPES)
-    else:
-        creds_json = os.environ.get('GOOGLE_CREDENTIALS')
-        if not creds_json:
-            raise RuntimeError("No Google credentials found (file or GOOGLE_CREDENTIALS env var)")
-        creds = Credentials.from_service_account_info(json.loads(creds_json), scopes=GSHEETS_SCOPES)
-    return gspread.authorize(creds)
+        return gspread.authorize(creds)
+
+    creds_json = os.environ.get('GOOGLE_CREDENTIALS')
+    if creds_json:
+        try:
+            creds = Credentials.from_service_account_info(json.loads(creds_json), scopes=GSHEETS_SCOPES)
+            return gspread.authorize(creds)
+        except Exception as e:
+            print(f"[SHEETS] GOOGLE_CREDENTIALS parse error: {e}")
+
+    creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_B64')
+    if creds_b64:
+        try:
+            creds_json = base64.b64decode(creds_b64).decode('utf-8')
+            creds = Credentials.from_service_account_info(json.loads(creds_json), scopes=GSHEETS_SCOPES)
+            return gspread.authorize(creds)
+        except Exception as e:
+            print(f"[SHEETS] GOOGLE_CREDENTIALS_B64 parse error: {e}")
+
+    raise RuntimeError("No Google credentials found")
 
 def submit_to_google_form(data):
     try:
