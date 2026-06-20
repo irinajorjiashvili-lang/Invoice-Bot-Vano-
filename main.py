@@ -54,26 +54,33 @@ def safe_send(chat_id, text, reply_markup=None):
 
 def submit_to_google_form(data):
     try:
+        import random
         form_data = {entry_id: str(data[field])
                      for field, entry_id in GOOGLE_FORM_FIELDS.items()
                      if field in data and data[field]}
         month = str(data.get('Date_Month', '')).zfill(2)
         day   = str(data.get('Date_Day', '')).zfill(2)
         form_data['entry.2136135204'] = f"{data.get('Date_Year', '')}-{month}-{day}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        import random
         form_data['fvv'] = '1'
         form_data['pageHistory'] = '0'
         form_data['fbzx'] = str(random.randint(-9007199254740991, 9007199254740991))
 
+        form_url = GOOGLE_FORM_SUBMIT_URL.replace('/formResponse', '/viewform')
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': form_url,
+            'Origin': 'https://docs.google.com',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
+
+        session = requests.Session()
+        session.get(form_url, timeout=10)
+
         print(f"[FORM] Отправляю: {form_data}")
-        r = requests.post(GOOGLE_FORM_SUBMIT_URL, data=form_data, headers=headers,
-                          allow_redirects=True, timeout=15)
+        r = session.post(GOOGLE_FORM_SUBMIT_URL, data=form_data, headers=headers,
+                         allow_redirects=True, timeout=15)
         print(f"[FORM] HTTP {r.status_code} | {r.text[:200]}")
-        return r.status_code in [200, 302, 400]
+        return r.status_code in [200, 302]
     except Exception as e:
         print(f"[FORM] error: {e}")
         return False
