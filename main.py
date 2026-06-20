@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import threading
 import requests
@@ -12,6 +13,7 @@ print("Starting Invoice Bot...")
 BOT_TOKEN    = os.environ.get('BOT_TOKEN', '8760516717:AAEmEESz8YxnqEnBIOrHKk5-n8Hns5L8wVA')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 
+GOOGLE_FORM_VIEW = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/viewform"
 GOOGLE_FORM_URL  = "https://docs.google.com/forms/d/e/1FAIpQLSdF6sBVKX0dW4qFcsmcn1_cBceoOY_wg-AvKFWFfdU0KSv6Yw/formResponse"
 DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1_MYLYCzkXrrG8FJzW8JazWHTXdS2sgC4"
 
@@ -63,15 +65,24 @@ def safe_cb(call_id, text=''):
 
 def submit_form(data):
     try:
+        session = requests.Session()
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        session.headers.update(headers)
+
+        # Загружаем форму чтобы получить fbzx токен и куки
+        view = session.get(GOOGLE_FORM_VIEW, timeout=15)
+        fbzx_match = re.search(r'[\"\']fbzx[\"\']\s*[,:]\s*[\"\']?(-?\d+)', view.text)
+        fbzx = fbzx_match.group(1) if fbzx_match else str(int(time.time() * 1000))
+        print(f"[FORM] fbzx={fbzx}")
+
         form_data = {v: str(data[k]) for k, v in FORM_FIELDS.items() if k in data and data[k]}
-        print(f"[FORM] Sending: {form_data}")
-        r = requests.post(
-            GOOGLE_FORM_URL, data=form_data,
-            headers={'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded'},
-            allow_redirects=True, timeout=30,
-        )
+        form_data['fvv']         = '1'
+        form_data['fbzx']        = fbzx
+        form_data['pageHistory'] = '0'
+
+        r = session.post(GOOGLE_FORM_URL, data=form_data, allow_redirects=True, timeout=30)
         print(f"[FORM] {r.status_code}")
-        return r.status_code in [200, 302, 400]
+        return r.status_code in [200, 302]
     except Exception as e:
         print(f"[FORM] {e}")
         return False
