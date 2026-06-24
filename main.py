@@ -9,7 +9,7 @@ import threading
 os.environ['PYTHONUNBUFFERED'] = '1'
 print("🚀 Auto Invoice Bot starting...")
 
-BOT_TOKEN  = os.environ.get('BOT_TOKEN', '8760516717:AAH6q12ZZZujNdW6XQh8aigZGVOO4fUSQwo')
+BOT_TOKEN  = os.environ.get('BOT_TOKEN', '8760516717:AAGdQjEg86bVai7R9o-izTQL7LYzDaRMNME')
 BOT_PASSWORD = os.environ.get('BOT_PASSWORD', 'Hybridi2026')
 bot = telebot.TeleBot(BOT_TOKEN)
 user_state = {}
